@@ -112,7 +112,7 @@ function ChannelArchitect() {
       <header className="border-b border-border" data-print-hide>
         <div className="max-w-[1100px] mx-auto px-6 py-5 flex items-center justify-between">
           <Link to="/" className="font-serif text-xl text-primary tracking-tight">
-            Channel Architect
+            The Partner Brief
           </Link>
           <nav className="text-sm">
             <Link
@@ -126,7 +126,7 @@ function ChannelArchitect() {
       </header>
 
       <div data-print-header className="text-center">
-        Channel Architect — {scenario?.label ?? ""}
+        The Partner Brief — {scenario?.label ?? ""}
       </div>
 
       <main className="max-w-[1100px] mx-auto px-6 py-16">
@@ -175,7 +175,7 @@ function ScenarioSelector({ onSelect }: { onSelect: (s: Scenario) => void }) {
     <>
       <section className="max-w-[760px] mx-auto text-center pb-16">
         <h1 className="font-serif text-5xl sm:text-6xl text-primary tracking-tight mb-4">
-          Channel Architect
+          The Partner Brief
         </h1>
         <p className="text-lg text-muted-foreground mb-8">
           Partner program design for SaaS companies, in 60 seconds.
