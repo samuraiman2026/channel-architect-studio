@@ -4,11 +4,11 @@ export const Route = createFileRoute("/about")({
   component: AboutPage,
   head: () => ({
     meta: [
-      { title: "About — Channel Architect" },
+      { title: "About — The Partner Brief" },
       {
         name: "description",
         content:
-          "About Channel Architect — a tool that generates partner program designs for SaaS companies.",
+          "About The Partner Brief — a tool that generates partner program designs for SaaS companies.",
       },
     ],
   }),
@@ -20,7 +20,7 @@ function AboutPage() {
       <header className="border-b border-border">
         <div className="max-w-[1100px] mx-auto px-6 py-5 flex items-center justify-between">
           <Link to="/" className="font-serif text-xl text-primary tracking-tight">
-            Channel Architect
+            The Partner Brief
           </Link>
           <nav className="text-sm">
             <Link to="/" className="text-muted-foreground hover:text-primary">
@@ -32,11 +32,11 @@ function AboutPage() {
 
       <main className="max-w-[760px] mx-auto px-6 py-16">
         <h1 className="font-serif text-4xl sm:text-5xl text-primary mb-8">
-          About Channel Architect
+          About The Partner Brief
         </h1>
         <div className="space-y-5 text-foreground leading-relaxed">
           <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Channel Architect
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. The Partner Brief
             is a tool authored by Pranjal that produces a credible v1 partner program
             design for a SaaS company, grounded in a three-axis framework: economic
             role mix, primary partner archetypes, and vendor GTM stage.
