@@ -36,20 +36,19 @@ function AboutPage() {
         </h1>
         <div className="space-y-5 text-foreground leading-relaxed">
           <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. The Partner Brief
-            is a tool authored by Pranjal that produces a credible v1 partner program
-            design for a SaaS company, grounded in a three-axis framework: economic
-            role mix, primary partner archetypes, and vendor GTM stage.
+            The Partner Brief is a partner-program planning tool authored by Pranjal. It turns your
+            company context, preferred partner types, planning emphasis, and stage into a first
+            design for review.
           </p>
           <p>
-            Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
-            ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-            ex ea commodo consequat. The full writeup, including a defense of the
-            three-axis framework and a comparison against published programs at
-            Snowflake and HubSpot, will appear here.
+            This version uses explicit rules, not an AI model or externally validated benchmarks.
+            Its output is a set of hypotheses, not proof that a partner motion will work. Use it to
+            make operating choices visible, then validate those choices with actual customer and
+            partner evidence.
           </p>
           <p className="text-sm text-muted-foreground italic pt-4">
-            (Real writeup forthcoming.)
+            Drafts are saved only in this browser. Shared workspaces, evidence records, approvals,
+            and operational workflows are planned for a later version.
           </p>
         </div>
       </main>

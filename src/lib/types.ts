@@ -29,7 +29,7 @@ export interface AxisSettings {
 }
 
 export interface Scenario {
-  id: ScenarioId;
+  id: ScenarioId | "custom";
   label: string;
   arr: string;
   motion: string;

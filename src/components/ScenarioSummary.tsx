@@ -15,13 +15,11 @@ export function ScenarioSummary({ scenario, settings }: Props) {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
             Scenario
           </div>
-          <div className="font-serif text-base text-primary leading-tight">
-            {scenario.label}
-          </div>
+          <div className="font-serif text-base text-primary leading-tight">{scenario.label}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-            Economics
+            Planning emphasis
           </div>
           <div className="text-foreground">{econStr}</div>
         </div>

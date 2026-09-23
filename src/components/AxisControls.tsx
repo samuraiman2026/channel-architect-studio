@@ -35,8 +35,7 @@ export function AxisControls({ scenario, initial, onGenerate, onChangeScenario }
     settings.economics.influence +
     settings.economics.buildOn;
 
-  const canGenerate =
-    econTotal === 100 && settings.primaryArchetypes.length >= 1;
+  const canGenerate = econTotal === 100 && settings.primaryArchetypes.length >= 1;
 
   const toggle = (group: "primaryArchetypes" | "secondaryArchetypes", a: Archetype) => {
     setSettings((s) => {
@@ -79,11 +78,9 @@ export function AxisControls({ scenario, initial, onGenerate, onChangeScenario }
 
       {/* Axis 1 */}
       <section>
-        <h2 className="font-serif text-2xl text-primary mb-1">
-          How will partners make money?
-        </h2>
+        <h2 className="font-serif text-2xl text-primary mb-1">How will partners make money?</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Most successful programs run two or three economic roles in parallel.
+          Allocate 100% of your planning attention. These are not commission rates.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {(
@@ -122,13 +119,11 @@ export function AxisControls({ scenario, initial, onGenerate, onChangeScenario }
       <section>
         <h2 className="font-serif text-2xl text-primary mb-1">Who are the partners?</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Pick 2-3 primary archetypes. The program will be designed around these.
+          Pick at least one primary partner type. The pilot will be designed around these.
         </p>
 
         <div className="mb-5">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Primary
-          </div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Primary</div>
           <div className="flex flex-wrap gap-2">
             {ALL_ARCHETYPES.map((a) => {
               const active = settings.primaryArchetypes.includes(a);
@@ -178,9 +173,7 @@ export function AxisControls({ scenario, initial, onGenerate, onChangeScenario }
 
       {/* Axis 3 */}
       <section>
-        <h2 className="font-serif text-2xl text-primary mb-1">
-          What stage is the vendor?
-        </h2>
+        <h2 className="font-serif text-2xl text-primary mb-1">What stage is the vendor?</h2>
         <p className="text-sm text-muted-foreground mb-6">
           Stage determines what&rsquo;s affordable, not just what&rsquo;s optimal.
         </p>
@@ -207,8 +200,8 @@ export function AxisControls({ scenario, initial, onGenerate, onChangeScenario }
 
       {settings.stage === "Pre-PMF" && (
         <div className="border border-border bg-accent p-4 text-sm text-accent-foreground">
-          At Pre-PMF stage, the tool will recommend <strong>NOT</strong> building a formal
-          program. This is a deliberate output.
+          At Pre-PMF stage, the tool will recommend <strong>NOT</strong> building a formal program.
+          This is a deliberate output.
         </div>
       )}
 

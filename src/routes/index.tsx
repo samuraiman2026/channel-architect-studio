@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { SCENARIO_LIST } from "@/lib/scenarios";
 import type { AxisSettings, Scenario, SectionKey } from "@/lib/types";
+import { generateDesign, validateDesignInputs, type Sections } from "@/lib/designEngine";
 import { ScenarioCard } from "@/components/ScenarioCard";
 import { AxisControls } from "@/components/AxisControls";
-import { LoadingState } from "@/components/LoadingState";
 import { OutputSection } from "@/components/OutputSection";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
 
@@ -16,15 +16,23 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Partner program design for SaaS companies, in 60 seconds. A credible v1 program design grounded in real benchmarks.",
+          "Build a first partner-program design from your company context and planning choices.",
       },
     ],
   }),
 });
 
-type Phase = "select" | "configure" | "loading" | "output";
+type Phase = "select" | "configure" | "output";
 
-type Sections = Record<SectionKey, string>;
+interface SavedDraft {
+  id: string;
+  savedAt: string;
+  scenario: Scenario;
+  settings: AxisSettings;
+  sections: Sections;
+}
+
+const STORAGE_KEY = "channel-architect-drafts-v1";
 
 const ORDER: Array<{ key: SectionKey; letter: string; title: string }> = [
   { key: "exec-summary", letter: "A", title: "Executive Summary" },
@@ -38,21 +46,35 @@ const ORDER: Array<{ key: SectionKey; letter: string; title: string }> = [
   { key: "risks", letter: "I", title: "Risks and Watch-Items" },
 ];
 
-async function fetchSection(key: SectionKey, scenarioId: string, settings: AxisSettings) {
-  const res = await fetch(`/api/generate/${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scenario: scenarioId, axisSettings: settings }),
-  });
-  const json = (await res.json()) as { section: string };
-  return json.section;
-}
-
 function ChannelArchitect() {
   const [phase, setPhase] = useState<Phase>("select");
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [settings, setSettings] = useState<AxisSettings | null>(null);
-  const [sections, setSections] = useState<Partial<Sections>>({});
+  const [sections, setSections] = useState<Sections | null>(null);
+  const [drafts, setDrafts] = useState<SavedDraft[]>([]);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (Array.isArray(parsed)) {
+        setDrafts(
+          parsed.filter(
+            (item): item is SavedDraft =>
+              typeof item === "object" &&
+              item !== null &&
+              typeof item.id === "string" &&
+              typeof item.savedAt === "string" &&
+              typeof item.scenario?.label === "string" &&
+              typeof item.settings?.stage === "string" &&
+              typeof item.sections?.["exec-summary"] === "string",
+          ),
+        );
+      }
+    } catch {
+      setNotice("Saved drafts on this device could not be read.");
+    }
+  }, []);
 
   const handleSelectScenario = (s: Scenario) => {
     setScenario(s);
@@ -60,50 +82,41 @@ function ChannelArchitect() {
     setPhase("configure");
   };
 
-  const handleGenerate = async (axisSettings: AxisSettings) => {
+  const handleGenerate = (axisSettings: AxisSettings) => {
     if (!scenario) return;
-    setSettings(axisSettings);
-    setSections({});
-    setPhase("loading");
-
-    const start = Date.now();
-
-    const run = async () => {
-      const acc: Partial<Sections> = {};
-      // Batch 1: ipp, tiering, motions
-      const b1 = await Promise.all(
-        (["ipp", "tiering", "motions"] as SectionKey[]).map((k) =>
-          fetchSection(k, scenario.id, axisSettings).then((v) => [k, v] as const),
-        ),
-      );
-      b1.forEach(([k, v]) => (acc[k] = v));
-      // Batch 2
-      const b2 = await Promise.all(
-        (["economics", "enablement", "launch-plan"] as SectionKey[]).map((k) =>
-          fetchSection(k, scenario.id, axisSettings).then((v) => [k, v] as const),
-        ),
-      );
-      b2.forEach(([k, v]) => (acc[k] = v));
-      // Batch 3
-      const b3 = await Promise.all(
-        (["strategic-rationale", "risks"] as SectionKey[]).map((k) =>
-          fetchSection(k, scenario.id, axisSettings).then((v) => [k, v] as const),
-        ),
-      );
-      b3.forEach(([k, v]) => (acc[k] = v));
-      // Batch 4
-      acc["exec-summary"] = await fetchSection("exec-summary", scenario.id, axisSettings);
-      return acc;
-    };
-
-    const data = await run();
-    // Hold for theatrical minimum (30s) so loading sequence completes
-    const MIN = 30000;
-    const elapsed = Date.now() - start;
-    if (elapsed < MIN) {
-      await new Promise((r) => setTimeout(r, MIN - elapsed));
+    const errors = validateDesignInputs(scenario, axisSettings);
+    if (errors.length) {
+      setNotice(errors.join(" "));
+      return;
     }
-    setSections(data);
+    const output = generateDesign(scenario, axisSettings);
+    setSettings(axisSettings);
+    setSections(output);
+    const draft: SavedDraft = {
+      id: crypto.randomUUID(),
+      savedAt: new Date().toISOString(),
+      scenario,
+      settings: axisSettings,
+      sections: output,
+    };
+    const next = [draft, ...drafts].slice(0, 20);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      setDrafts(next);
+      setNotice("Draft saved on this device. It is not synced or backed up.");
+    } catch {
+      setNotice(
+        "Design generated, but this device could not save it. Print or copy what you need.",
+      );
+    }
+    setPhase("output");
+  };
+
+  const openDraft = (draft: SavedDraft) => {
+    setScenario(draft.scenario);
+    setSettings(draft.settings);
+    setSections(draft.sections);
+    setNotice(`Opened saved draft from ${new Date(draft.savedAt).toLocaleString()}.`);
     setPhase("output");
   };
 
@@ -130,8 +143,21 @@ function ChannelArchitect() {
       </div>
 
       <main className="max-w-[1100px] mx-auto px-6 py-16">
+        {notice && (
+          <p
+            role="status"
+            className="max-w-[760px] mx-auto mb-8 text-sm text-muted-foreground"
+            data-print-hide
+          >
+            {notice}
+          </p>
+        )}
         {phase === "select" && (
-          <ScenarioSelector onSelect={handleSelectScenario} />
+          <ScenarioSelector
+            onSelect={handleSelectScenario}
+            drafts={drafts}
+            onOpenDraft={openDraft}
+          />
         )}
 
         {phase === "configure" && scenario && settings && (
@@ -145,23 +171,17 @@ function ChannelArchitect() {
           </div>
         )}
 
-        {phase === "loading" && (
-          <div className="max-w-[760px] mx-auto flex justify-center pt-8">
-            <LoadingState totalMs={32000} />
-          </div>
-        )}
-
-        {phase === "output" && scenario && settings && (
+        {phase === "output" && scenario && settings && sections && (
           <OutputView
             scenario={scenario}
             settings={settings}
-            sections={sections as Sections}
+            sections={sections}
             onRegenerate={() => setPhase("configure")}
             onStartOver={() => {
               setPhase("select");
               setScenario(null);
               setSettings(null);
-              setSections({});
+              setSections(null);
             }}
           />
         )}
@@ -170,7 +190,27 @@ function ChannelArchitect() {
   );
 }
 
-function ScenarioSelector({ onSelect }: { onSelect: (s: Scenario) => void }) {
+function ScenarioSelector({
+  onSelect,
+  drafts,
+  onOpenDraft,
+}: {
+  onSelect: (s: Scenario) => void;
+  drafts: SavedDraft[];
+  onOpenDraft: (draft: SavedDraft) => void;
+}) {
+  const [custom, setCustom] = useState({ label: "", arr: "", motion: "", icp: "", ask: "" });
+  const createCustom = () =>
+    onSelect({
+      id: "custom",
+      ...custom,
+      defaults: {
+        economics: { resell: 0, refer: 40, influence: 40, buildOn: 20 },
+        primaryArchetypes: ["SI / Consulting"],
+        secondaryArchetypes: [],
+        stage: "Early Scale ($1-10M ARR)",
+      },
+    });
   return (
     <>
       <section className="max-w-[760px] mx-auto text-center pb-16">
@@ -178,28 +218,77 @@ function ScenarioSelector({ onSelect }: { onSelect: (s: Scenario) => void }) {
           The Partner Brief
         </h1>
         <p className="text-lg text-muted-foreground mb-8">
-          Partner program design for SaaS companies, in 60 seconds.
+          A working draft for your partner program, built from your choices.
         </p>
         <p className="text-base text-foreground leading-relaxed">
-          Most channel program failures are stage failures or motion failures. Channel
-          Architect produces a credible v1 program design grounded in real benchmarks
-          from Snowflake, HubSpot, and other published programs — so you can
-          pressure-test design choices before committing.
+          Explore a partner motion, pressure-test the assumptions, and decide what to validate with
+          customers and partners before committing resources.
         </p>
       </section>
 
       <section>
-        <h2 className="font-serif text-2xl text-primary mb-6 text-center">
-          Pick a scenario
-        </h2>
+        <h2 className="font-serif text-2xl text-primary mb-6 text-center">Start with a scenario</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {SCENARIO_LIST.map((s) => (
             <ScenarioCard key={s.id} scenario={s} onSelect={onSelect} />
           ))}
         </div>
-        <p className="mt-8 text-center text-sm italic text-muted-foreground">
-          Custom company input coming in v1.1.
-        </p>
+        <div className="max-w-[760px] mx-auto mt-12 border border-border bg-card p-6">
+          <h3 className="font-serif text-xl text-primary mb-2">Or use your company</h3>
+          <p className="text-sm text-muted-foreground mb-5">
+            Keep customer details non-sensitive. Drafts stay in this browser only.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                ["label", "Company or project name", true],
+                ["arr", "ARR or stage context", false],
+                ["motion", "Current sales motion", false],
+                ["icp", "Ideal customer", true],
+                ["ask", "Strategic partner goal", true],
+              ] as const
+            ).map(([key, label, required]) => (
+              <label key={key} className="text-sm text-foreground">
+                <span className="block mb-1">
+                  {label}
+                  {required ? " *" : ""}
+                </span>
+                <input
+                  className="w-full border border-border bg-background px-3 py-2"
+                  value={custom[key]}
+                  maxLength={240}
+                  onChange={(event) => setCustom({ ...custom, [key]: event.target.value })}
+                />
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={createCustom}
+            disabled={!custom.label.trim() || !custom.icp.trim() || !custom.ask.trim()}
+            className="mt-5 bg-primary text-primary-foreground px-5 py-2.5 text-sm disabled:opacity-40"
+          >
+            Design for my company
+          </button>
+        </div>
+        {drafts.length > 0 && (
+          <div className="max-w-[760px] mx-auto mt-12">
+            <h3 className="font-serif text-xl text-primary mb-3">Saved drafts on this device</h3>
+            <ul className="space-y-2">
+              {drafts.map((draft) => (
+                <li key={draft.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenDraft(draft)}
+                    className="text-left underline underline-offset-4 text-primary"
+                  >
+                    {draft.scenario.label} · {new Date(draft.savedAt).toLocaleString()}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
     </>
   );
@@ -220,7 +309,10 @@ function OutputView({
 }) {
   return (
     <div className="max-w-[760px] mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8" data-print-hide>
+      <div
+        className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8"
+        data-print-hide
+      >
         <div className="flex-1">
           <ScenarioSummary scenario={scenario} settings={settings} />
         </div>
@@ -237,7 +329,7 @@ function OutputView({
             onClick={onRegenerate}
             className="border border-border bg-background px-5 py-2.5 text-sm hover:bg-accent transition-colors"
           >
-            Generate again
+            Revise design
           </button>
           <button
             type="button"
@@ -251,25 +343,16 @@ function OutputView({
 
       <article className="space-y-16">
         {ORDER.map(({ key, letter, title }) => (
-          <OutputSection
-            key={key}
-            letter={letter}
-            title={title}
-            markdown={sections[key] ?? ""}
-          />
+          <OutputSection key={key} letter={letter} title={title} markdown={sections[key] ?? ""} />
         ))}
       </article>
 
       <footer className="mt-20 pt-8 border-t border-border">
         <p className="text-xs italic text-muted-foreground leading-relaxed">
-          <span className="not-italic font-semibold text-foreground">
-            Generated rationale.
-          </span>{" "}
-          This design was generated using a three-axis framework: economic role mix,
-          primary partner archetypes, and vendor GTM stage. Each section was produced
-          by a separately-prompted call to Claude (Anthropic), with reference
-          benchmarks from published programs at Snowflake, HubSpot, and others. The
-          framework and prompts are authored by Pranjal; see{" "}
+          <span className="not-italic font-semibold text-foreground">Planning draft.</span> This
+          design is produced by a transparent rules-based framework using the inputs shown above. It
+          does not call an AI model, contain verified market benchmarks, or establish commercial
+          terms. Validate assumptions with your team, partners, and customers. See{" "}
           <Link to="/about" className="underline underline-offset-2">
             /about
           </Link>{" "}
