@@ -7,7 +7,7 @@
 
 ## Implementation status
 
-The shared deterministic engine, scenario presets, package scaffold, tenant-scoped program/review and pilot entities, validators, registered commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. Open Mercato 0.6.x sandbox generation discovered the original module routes, entities, and page. A standalone-layout check confirmed installed-package resolution and runtime loading of the three original program entities; it caught and fixed the package's decorator transform. The Studio workspace typecheck passes after the pilot slice. The full host typecheck is not clean because of unrelated sandbox errors. Migration generation and end-to-end host workflow validation remain open.
+The shared deterministic engine, scenario presets, package scaffold, tenant-scoped program/review and pilot entities, validators, registered commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. Studio production build and typecheck pass, and the deterministic-engine plus pilot-rule acceptance tests pass (9 total). Open Mercato 0.6.x sandbox generation discovered the original module routes, entities, and page. A standalone-layout check confirmed installed-package resolution and runtime loading of the three original program entities; it caught and fixed the package's decorator transform. The pilot slice has not yet been rerun through a real host generator. The full host typecheck is not clean because of unrelated sandbox errors. Migration generation and end-to-end host workflow validation remain open.
 
 ## Outcome
 

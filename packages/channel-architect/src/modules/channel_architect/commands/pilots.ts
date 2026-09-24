@@ -17,6 +17,7 @@ import {
   pilotCreateSchema,
   pilotStatusUpdateSchema,
 } from '../data/validators'
+import { canCompletePilot, canUpdatePilotCheckpoints, isPilotTransitionAllowed, type PilotStatus } from '../lib/pilotState'
 import { ensureOrganizationScope, ensureTenantScope } from './scope'
 
 type PilotScope = { tenantId: string; organizationId: string }
@@ -120,25 +121,19 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
     })
     if (!pilot) throw notFound('Pilot not found')
 
-    const allowed: Record<ChannelArchitectPilot['status'], string[]> = {
-      planned: ['active', 'cancelled'],
-      active: ['paused', 'completed', 'cancelled'],
-      paused: ['active', 'cancelled'],
-      completed: [],
-      cancelled: [],
-    }
-    if (!allowed[pilot.status].includes(parsed.status)) {
+    if (!isPilotTransitionAllowed(pilot.status, parsed.status as PilotStatus)) {
       throw new CrudHttpError(409, { error: `A pilot cannot move from ${pilot.status} to ${parsed.status}.` })
     }
     if (parsed.status === 'completed') {
-      const unresolved = await em.count(ChannelArchitectPilotCheckpoint, {
+      const checkpointStatuses = await em.find(ChannelArchitectPilotCheckpoint, {
         pilotId: pilot.id,
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
-        status: 'planned',
         deletedAt: null,
-      })
-      if (unresolved > 0) throw new CrudHttpError(409, { error: 'Complete or skip every checkpoint before recording the pilot outcome.' })
+      }, { fields: ['status'] })
+      if (!canCompletePilot(checkpointStatuses.map((checkpoint) => checkpoint.status))) {
+        throw new CrudHttpError(409, { error: 'Complete or skip every checkpoint before recording the pilot outcome.' })
+      }
     }
     const outcome = parsed.status === 'completed' ? parsed.outcome! : null
     const updated = await em.nativeUpdate(ChannelArchitectPilot, {
@@ -167,7 +162,7 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
       deletedAt: null,
     })
     if (!pilot) throw notFound('Pilot not found')
-    if (pilot.status !== 'active' && pilot.status !== 'paused') {
+    if (!canUpdatePilotCheckpoints(pilot.status)) {
       throw new CrudHttpError(409, { error: 'Checkpoints can only be updated while a pilot is active or paused.' })
     }
     const checkpoint = await em.findOne(ChannelArchitectPilotCheckpoint, {
