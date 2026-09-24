@@ -1,4 +1,5 @@
 import type { AxisSettings, Scenario, Sections } from "./types";
+import { DESIGN_ENGINE_VERSION } from "./types";
 
 export type { Sections } from "./types";
 export { DESIGN_ENGINE_VERSION } from "./types";
@@ -27,7 +28,7 @@ export function validateDesignInputs(scenario: Scenario, settings: AxisSettings)
   return errors;
 }
 
-export function generateDesign(scenario: Scenario, settings: AxisSettings): Sections {
+function generateDesignV1(scenario: Scenario, settings: AxisSettings): Sections {
   const errors = validateDesignInputs(scenario, settings);
   if (errors.length) throw new Error(errors.join(" "));
 
@@ -64,9 +65,40 @@ export function generateDesign(scenario: Scenario, settings: AxisSettings): Sect
       ? `**No formal tiers yet.** Use a single design-partner status with a written hypothesis, named owners, and a review date. Do not promise future benefits or exclusivity.\n\nPromotion criterion: repeatable customer value, not a logo or signed agreement.\n\n${evidence}`
       : `### Pilot status\nInvite a limited cohort with a named sponsor, agreed customer use case, onboarding checklist, and review date. Benefits are access to a joint plan and support, not automatic discounts.\n\n### Scale status, proposed only\nConsider a higher tier after evidence of customer outcomes, reliable collaboration, and support capacity. Define thresholds from observed pilot data before publishing them.\n\n${evidence}`,
     economics: `### Planning emphasis, not payout terms\n${active.map((role) => `- **${ROLE_NAMES[role]}: ${settings.economics[role]}%** of design attention. Test ${roleWork[role]}.`).join("\n")}\n\nNo commission rates, margins, revenue-share terms, or ROI are implied by these weights. Before any commercial offer, model unit economics, attribution, payment triggers, clawbacks, and legal approval using actual company data.\n\n${evidence}`,
-    motions: `### First motion: ${ROLE_NAMES[lead]}\nDefine a single pilot workflow for ${leadWork}. State the customer trigger, partner action, vendor response, handoff owner, and outcome to record.\n\n${active.slice(1).length ? `### Later tests\n${active.slice(1).map((role) => `- ${ROLE_NAMES[role]}: test ${roleWork[role]} after the first workflow is operable.`).join("\n")}` : "Keep other motions out of scope until the first one is understood."}\n\nDo not count a partner-influenced opportunity as partner-sourced. Preserve separate source, influence, and fulfillment fields.\n\n${evidence}`,
+    motions: `### First motion: ${ROLE_NAMES[lead]}\nDefine a single pilot workflow for ${leadWork}. State the customer trigger, partner action, vendor response, handoff owner, and outcome to record.\n\n${
+      active.slice(1).length
+        ? `### Later tests\n${active
+            .slice(1)
+            .map(
+              (role) =>
+                `- ${ROLE_NAMES[role]}: test ${roleWork[role]} after the first workflow is operable.`,
+            )
+            .join("\n")}`
+        : "Keep other motions out of scope until the first one is understood."
+    }\n\nDo not count a partner-influenced opportunity as partner-sourced. Preserve separate source, influence, and fulfillment fields.\n\n${evidence}`,
     enablement: `### ${isPrePmf ? "Design-partner" : "Pilot-partner"} onboarding\n- One-page customer problem and ideal customer profile.\n- Demo or discovery script for **${scenario.icp}**.\n- Role-specific workflow for **${ROLE_NAMES[lead]}**, including what the partner may and may not promise.\n- Named contacts, escalation path, data-sharing permissions, and a feedback cadence.\n- A joint practice run before customer outreach.\n\nOnly create scaled certification or tier-specific materials after the pilot exposes a repeatable need.\n\n${evidence}`,
     "launch-plan": `### Days 1–30: frame and recruit\nConfirm the target customer problem, choose a small set of ${partnerUnit}, assign owners, and record a baseline for the direct motion. Agree on one ${ROLE_NAMES[lead].toLowerCase()} workflow.\n\n### Days 31–60: run\nOnboard partners, work real customer cases with consent, log each handoff and outcome, and hold a weekly friction review.\n\n### Days 61–100: decide\nReview customer outcomes, partner effort, vendor effort, incremental contribution, and support burden. Continue, revise, or stop. ${isPrePmf ? "Stay in discovery until product-market fit evidence supports a repeatable channel motion." : "Only then set tier thresholds or commercial terms."}\n\n${evidence}`,
     risks: `- **False attribution:** Separate sourced, influenced, and fulfilled activity. Capture the evidence and decision owner.\n- **Premature complexity:** ${stageGuardrail}\n- **Partner/customer mismatch:** Validate access to ${scenario.icp} with real cases before scaling recruitment.\n- **Unpriced obligations:** Do not publish payout or support promises before finance, legal, and operations review.\n- **Data and trust:** Obtain permission for shared customer data; define access, retention, and revocation.\n- **Unverified claims:** Treat this document as hypotheses until customer, partner, and company evidence is attached.\n\n${evidence}`,
   };
+}
+
+type DesignGenerator = (scenario: Scenario, settings: AxisSettings) => Sections;
+
+const DESIGN_GENERATORS: Record<string, DesignGenerator> = {
+  // Keep historic keys pinned when DESIGN_ENGINE_VERSION advances.
+  "1.0.0": generateDesignV1,
+};
+
+export function regenerateDesign(
+  scenario: Scenario,
+  settings: AxisSettings,
+  engineVersion: string,
+): Sections {
+  const generator = DESIGN_GENERATORS[engineVersion];
+  if (!generator) throw new Error(`Unsupported design engine version: ${engineVersion}`);
+  return generator(scenario, settings);
+}
+
+export function generateDesign(scenario: Scenario, settings: AxisSettings): Sections {
+  return regenerateDesign(scenario, settings, DESIGN_ENGINE_VERSION);
 }

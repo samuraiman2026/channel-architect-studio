@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SCENARIOS } from "./scenarios";
-import { generateDesign, validateDesignInputs } from "./designEngine";
+import {
+  DESIGN_ENGINE_VERSION,
+  generateDesign,
+  regenerateDesign,
+  validateDesignInputs,
+} from "./designEngine";
 
 describe("design engine", () => {
   const scenario = SCENARIOS["ai-infra-b"];
@@ -38,5 +43,45 @@ describe("design engine", () => {
       1,
     );
     assert.throws(() => generateDesign({ ...scenario, ask: "" }, scenario.defaults));
+  });
+
+  it("replays saved version snapshots with their recorded engine and preserves prior output", () => {
+    const savedVersion = {
+      engineVersion: DESIGN_ENGINE_VERSION,
+      scenarioSnapshot: structuredClone(scenario),
+      settingsSnapshot: structuredClone(scenario.defaults),
+      outputSnapshot: generateDesign(scenario, scenario.defaults),
+    };
+
+    assert.deepEqual(
+      regenerateDesign(
+        savedVersion.scenarioSnapshot,
+        savedVersion.settingsSnapshot,
+        savedVersion.engineVersion,
+      ),
+      savedVersion.outputSnapshot,
+    );
+
+    const revisedSettings = {
+      ...savedVersion.settingsSnapshot,
+      economics: { resell: 80, refer: 20, influence: 0, buildOn: 0 },
+    };
+    const revisedOutput = generateDesign(savedVersion.scenarioSnapshot, revisedSettings);
+    assert.notDeepEqual(revisedOutput, savedVersion.outputSnapshot);
+    assert.deepEqual(
+      regenerateDesign(
+        savedVersion.scenarioSnapshot,
+        savedVersion.settingsSnapshot,
+        savedVersion.engineVersion,
+      ),
+      savedVersion.outputSnapshot,
+    );
+  });
+
+  it("does not silently replay an unsupported engine version", () => {
+    assert.throws(
+      () => regenerateDesign(scenario, scenario.defaults, "0.9.0"),
+      /Unsupported design engine version: 0.9.0/,
+    );
   });
 });
