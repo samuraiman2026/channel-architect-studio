@@ -12,6 +12,8 @@ The current Studio is still browser-local. It keeps drafts unapproved; a local e
 
 The package now includes a host-discoverable Playwright acceptance scenario at `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`. Open Mercato associates it with `channel_architect`, and the module build omits the spec from runtime output. It exercises role grants, independent review, version history, pilot completion, stale/unapproved version rejection, and archive behavior. It typechecks against Open Mercato's Playwright package, but has not run against a live host because the module is not yet installed there and the migration remains unapplied.
 
+The acceptance scenario also provisions a second organization and checks that an admin from the original organization cannot list, retrieve, revise, or review a program by guessing its ID. This cross-organization path typechecks and is discovered by the host runner, but has not yet executed against a migrated host.
+
 1. **Program**: tenant/organization, name, owner user ID, state, current version, and timestamps.
 2. **Program version**: immutable `Scenario` and `AxisSettings` snapshots, deterministic engine version, generated sections, creator, and timestamp. Revisions append; they do not overwrite prior or approved versions.
 3. **Review decision**: approver, decision, rationale, and timestamp. At most one final decision applies to one immutable version. Approval does not transfer to later versions.

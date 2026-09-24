@@ -4,6 +4,7 @@ import { SCENARIO_LIST } from '../lib/scenarios'
 type Role = 'superadmin' | 'admin' | 'employee'
 type ProgramCreated = { programId: string; versionId: string; version: number }
 type PilotCreated = { pilotId: string; checkpointIds: string[] }
+type OrganizationCreated = { id: string }
 
 const credentials: Record<Role, { email: string; password: string }> = {
   superadmin: {
@@ -59,6 +60,29 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     expect(initialDetail.versions).toHaveLength(1)
     expect(initialDetail.versions[0].scenarioSnapshot).toEqual(scenario)
 
+    const organizationResponse = await page.request.post('/api/directory/organizations', {
+      data: { name: `${programName} separate organization` },
+    })
+    expect(organizationResponse.status()).toBe(201)
+    const foreignOrganization = await organizationResponse.json() as OrganizationCreated
+    const previousOrganizationCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'om_selected_org')
+    let foreignProgram: ProgramCreated
+    try {
+      await page.context().addCookies([{
+        name: 'om_selected_org',
+        value: foreignOrganization.id,
+        url: new URL(page.url()).origin,
+      }])
+      const foreignProgramResponse = await page.request.post('/api/channel_architect/programs', {
+        data: { ...createPayload, name: `${programName} separate organization` },
+      })
+      expect(foreignProgramResponse.status()).toBe(201)
+      foreignProgram = await foreignProgramResponse.json() as ProgramCreated
+    } finally {
+      if (previousOrganizationCookie) await page.context().addCookies([previousOrganizationCookie])
+      else await page.context().clearCookies({ name: 'om_selected_org' })
+    }
+
     const ownerReviewResponse = await page.request.post(
       `/api/channel_architect/programs/${created.versionId}/review`,
       { data: { decision: 'approved', rationale: 'Owner cannot review this version.' } },
@@ -84,6 +108,27 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       expect(approvedDetail.program.status).toBe('active')
       expect(approvedDetail.reviews).toHaveLength(1)
       expect(approvedDetail.reviews[0].decision).toBe('approved')
+
+      const foreignDetailResponse = await reviewerPage.request.get(`/api/channel_architect/programs?id=${foreignProgram.programId}`)
+      expect(foreignDetailResponse.status()).toBe(404)
+      const scopedListResponse = await reviewerPage.request.get('/api/channel_architect/programs')
+      expect(scopedListResponse.status()).toBe(200)
+      const scopedList = await scopedListResponse.json()
+      expect(scopedList.items.some((item: { id: string }) => item.id === foreignProgram.programId)).toBe(false)
+      const foreignRevisionResponse = await reviewerPage.request.patch('/api/channel_architect/programs', {
+        data: {
+          programId: foreignProgram.programId,
+          expectedVersion: 1,
+          scenario,
+          settings,
+        },
+      })
+      expect(foreignRevisionResponse.status()).toBe(404)
+      const foreignReviewResponse = await reviewerPage.request.post(
+        `/api/channel_architect/programs/${foreignProgram.versionId}/review`,
+        { data: { decision: 'approved', rationale: 'Cross-organization access must be denied.' } },
+      )
+      expect(foreignReviewResponse.status()).toBe(404)
     } finally {
       await reviewerPage.close()
     }

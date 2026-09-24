@@ -11,6 +11,8 @@ The shared deterministic engine now has a pinned version registry so persisted i
 
 The module now has a host-discoverable Playwright acceptance scenario in `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`. It covers role grants, owner/reviewer separation, persisted program versions, approved-version pilot creation and completion, rejection of stale or unapproved pilot versions, and archive behavior. The scenario typechecks against the host Playwright package but has not yet run against an installed host with the module migration applied; package builds explicitly omit integration specs.
 
+The scenario also creates a second organization and verifies that a reviewer with program permissions in the primary organization cannot list, retrieve, revise, or review a guessed program ID from the other organization. This check is prepared but remains unexecuted until the module is wired into a host with its migration applied.
+
 ## Outcome
 
 Evolve Channel Architect Studio from a single-browser planning prototype into an installable Open Mercato module for designing, versioning, and reviewing partner programs. Preserve the standalone Studio experience while making one deterministic design engine the source of truth.

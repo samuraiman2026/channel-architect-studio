@@ -8,6 +8,8 @@ The module's discovery, runtime, and schema checks used the official-modules wor
 
 The host-discoverable Playwright acceptance scenario is in `src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`. Open Mercato associates it with the `channel_architect` module, and the package build omits it from runtime output. It typechecks against the pinned host test package, but still needs to be run with this module installed in an Open Mercato sandbox and the migration applied to its disposable database.
 
+It also creates a separate organization and verifies that an admin scoped to the original organization cannot access that organization's program using a guessed ID. This check is implemented in the acceptance scenario but has not yet been run against a migrated host.
+
 Generated partner-program content is a planning hypothesis. It is not a benchmark, forecast, commercial offer, commission schedule, or source of attribution truth.
 
 See [SPEC-001](../../.ai/specs/SPEC-001-channel-architect-open-mercato.md) and the repository's [Open Mercato integration notes](../../docs/open-mercato-integration.md) for the intended data and security boundaries.
