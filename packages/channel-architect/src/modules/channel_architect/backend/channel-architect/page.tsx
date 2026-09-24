@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Page, PageBody } from '@open-mercato/ui/backend/Page'
 import { apiCall } from '@open-mercato/ui/backend/utils/apiCall'
 import { SCENARIO_LIST } from '../../lib/scenarios'
-import type { AxisSettings, Scenario, Sections } from '../../lib/types'
+import type { Archetype, AxisSettings, Scenario, Sections } from '../../lib/types'
 import { getProgramVersionStateLabel } from '../../lib/programVersionState'
 
 type Program = {
@@ -51,6 +51,13 @@ type Pilot = {
 const API = '/api/channel_architect/programs'
 const PILOT_API = '/api/channel_architect/pilots'
 const initialPreset = SCENARIO_LIST[0]
+const ARCHETYPES: Archetype[] = ['SI / Consulting', 'ISV', 'VAR', 'MSP', 'Referral / Agency', 'Marketplace']
+const ECONOMIC_AXES = [
+  ['resell', 'Resell'],
+  ['refer', 'Refer'],
+  ['influence', 'Influence'],
+  ['buildOn', 'Build-on'],
+] as const
 
 function messageFrom(result: unknown, fallback: string) {
   if (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string') {
@@ -88,6 +95,23 @@ export default function ChannelArchitectProgramsPage() {
   const selectedVersion = detail?.versions.find((version) => version.id === selectedVersionId) ?? detail?.versions[0]
   const selectedReview = detail?.reviews.find((review) => review.programVersionId === selectedVersion?.id)
   const canStartPilot = Boolean(selectedVersion && selectedReview?.decision === 'approved' && selectedVersion.versionNumber === detail?.program.currentVersionNumber)
+  const economicTotal = Object.values(settings.economics).reduce((total, value) => total + value, 0)
+  const canSaveDesign = economicTotal === 100 && settings.primaryArchetypes.length > 0
+
+  function toggleArchetype(group: 'primaryArchetypes' | 'secondaryArchetypes', archetype: Archetype) {
+    setSettings((current) => ({
+      ...current,
+      [group]: current[group].includes(archetype)
+        ? current[group].filter((item) => item !== archetype)
+        : [...current[group], archetype],
+    }))
+  }
+
+  function updateEconomicAxis(key: keyof AxisSettings['economics'], value: string) {
+    const parsed = Number.parseInt(value, 10)
+    const amount = Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0
+    setSettings((current) => ({ ...current, economics: { ...current.economics, [key]: amount } }))
+  }
 
   const refreshPrograms = React.useCallback(async () => {
     setLoading(true)
@@ -303,8 +327,34 @@ export default function ChannelArchitectProgramsPage() {
                   {['Pre-PMF', 'Early Scale ($1-10M ARR)', 'Scaling ($10-50M ARR)', 'Mature ($50M+ ARR)'].map((stage) => <option key={stage}>{stage}</option>)}
                 </select>
               </label>
+              <section className="space-y-3 rounded-md border p-4">
+                <div>
+                  <h3 className="text-sm font-medium">Planning emphasis</h3>
+                  <p className="text-xs text-muted-foreground">Allocate 100% of planning attention. These are not commission rates.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {ECONOMIC_AXES.map(([key, label]) => (
+                    <label className="block text-sm" key={key}>{label} %
+                      <input type="number" min={0} max={100} step={1} inputMode="numeric" className="mt-1 w-full rounded border bg-background px-3 py-2" value={settings.economics[key]} onChange={(event) => updateEconomicAxis(key, event.target.value)} />
+                    </label>
+                  ))}
+                </div>
+                <p className={`text-xs ${economicTotal === 100 ? 'text-muted-foreground' : 'text-destructive'}`} role="status">Total: {economicTotal}%{economicTotal !== 100 ? ' (must equal 100%)' : ''}</p>
+              </section>
+              {(['primaryArchetypes', 'secondaryArchetypes'] as const).map((group) => (
+                <fieldset className="space-y-2" key={group}>
+                  <legend className="text-sm font-medium">{group === 'primaryArchetypes' ? 'Primary partner types' : 'Secondary partner types'}</legend>
+                  <p className="text-xs text-muted-foreground">{group === 'primaryArchetypes' ? 'Choose at least one type to anchor the design.' : 'Optional supporting partner types.'}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {ARCHETYPES.map((archetype) => {
+                      const active = settings[group].includes(archetype)
+                      return <button type="button" key={archetype} aria-pressed={active} onClick={() => toggleArchetype(group, archetype)} className={`rounded border px-3 py-1.5 text-sm ${active ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary'}`}>{archetype}</button>
+                    })}
+                  </div>
+                </fieldset>
+              ))}
               <div className="flex gap-2">
-                <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50" onClick={() => void saveProgram()} disabled={saving || !companyName.trim() || !icp.trim() || !ask.trim()}>{saving ? 'Saving…' : mode === 'create' ? 'Create program' : 'Save new version'}</button>
+                <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50" onClick={() => void saveProgram()} disabled={saving || !companyName.trim() || !icp.trim() || !ask.trim() || !canSaveDesign}>{saving ? 'Saving…' : mode === 'create' ? 'Create program' : 'Save new version'}</button>
                 <button className="rounded-md border px-4 py-2 text-sm" onClick={() => setMode(null)}>Cancel</button>
               </div>
             </section>
@@ -344,6 +394,10 @@ export default function ChannelArchitectProgramsPage() {
                   <div className="rounded-md border p-3 text-sm">
                     <p><strong>{selectedVersion.scenarioSnapshot.label}</strong> · engine {selectedVersion.engineVersion}</p>
                     <p className="mt-1 text-muted-foreground">Goal: {selectedVersion.scenarioSnapshot.ask}</p>
+                    <p className="mt-2">Planning emphasis: {ECONOMIC_AXES.map(([key, label]) => `${label} ${selectedVersion.settingsSnapshot.economics[key]}%`).join(' · ')}</p>
+                    <p className="mt-1">Primary: {selectedVersion.settingsSnapshot.primaryArchetypes.join(', ')}</p>
+                    <p className="mt-1">Secondary: {selectedVersion.settingsSnapshot.secondaryArchetypes.join(', ') || 'None'}</p>
+                    <p className="mt-1">Stage: {selectedVersion.settingsSnapshot.stage}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Saved {new Date(selectedVersion.createdAt).toLocaleString()} · creator {selectedVersion.createdBy}</p>
                   </div>
                   {selectedReview ? <div className="rounded-md border p-3 text-sm"><p className="font-medium">{selectedReview.decision} by {selectedReview.reviewerUserId}</p><p className="mt-1">{selectedReview.rationale}</p></div> : (
