@@ -8,11 +8,9 @@ import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
 import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/directory/utils/organizationScope'
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
-import { createLogger } from '@open-mercato/shared/lib/logger'
 import { ChannelArchitectProgram, ChannelArchitectProgramReview, ChannelArchitectProgramVersion } from '../../data/entities'
 import { programCreateSchema, programRevisionSchema } from '../../data/validators'
 
-const logger = createLogger('channel_architect')
 const resourceKind = 'channel_architect.program'
 
 export const metadata = {
@@ -48,7 +46,7 @@ async function getContext(req: Request): Promise<{
 function errorResponse(error: unknown, operation: string) {
   if (isCrudHttpError(error)) return NextResponse.json(error.body, { status: error.status })
   if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid program request.', issues: error.issues }, { status: 400 })
-  logger.error(`channel_architect ${operation} failed`, { err: error })
+  console.error(`[channel_architect] ${operation} failed`, error)
   return NextResponse.json({ error: 'Channel Architect request failed.' }, { status: 500 })
 }
 

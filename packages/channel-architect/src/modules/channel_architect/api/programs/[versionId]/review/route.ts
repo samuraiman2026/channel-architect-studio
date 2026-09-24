@@ -7,10 +7,8 @@ import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
 import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/directory/utils/organizationScope'
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
-import { createLogger } from '@open-mercato/shared/lib/logger'
 import { programReviewSchema } from '../../../../data/validators'
 
-const logger = createLogger('channel_architect')
 export const metadata = {
   POST: { requireAuth: true, requireFeatures: ['channel_architect.programs.approve'] },
 }
@@ -67,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ version
   } catch (error) {
     if (isCrudHttpError(error)) return NextResponse.json(error.body, { status: error.status })
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid review request.', issues: error.issues }, { status: 400 })
-    logger.error('channel_architect review POST failed', { err: error })
+    console.error('[channel_architect] review POST failed', error)
     return NextResponse.json({ error: 'Unable to record review.' }, { status: 500 })
   }
 }

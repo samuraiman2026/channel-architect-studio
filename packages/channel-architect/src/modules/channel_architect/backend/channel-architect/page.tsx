@@ -50,7 +50,7 @@ export default function ChannelArchitectProgramsPage() {
   const [selectedVersionId, setSelectedVersionId] = React.useState('')
   const [mode, setMode] = React.useState<'create' | 'revise' | null>(null)
   const [editingProgramId, setEditingProgramId] = React.useState('')
-  const [presetId, setPresetId] = React.useState(initialPreset.id)
+  const [presetId, setPresetId] = React.useState<Scenario['id']>(initialPreset.id)
   const [programName, setProgramName] = React.useState(`${initialPreset.label} Partner Program`)
   const [companyName, setCompanyName] = React.useState(initialPreset.label)
   const [arr, setArr] = React.useState(initialPreset.arr)
@@ -193,7 +193,7 @@ export default function ChannelArchitectProgramsPage() {
               )}
               <label className="block text-sm">Starting scenario
                 <select className="mt-1 w-full rounded border bg-background px-3 py-2" value={presetId} onChange={(event) => {
-                  setPresetId(event.target.value)
+                  setPresetId(event.target.value as Scenario['id'])
                   const seed = SCENARIO_LIST.find((item) => item.id === event.target.value) ?? initialPreset
                   setCompanyName(seed.label); setArr(seed.arr); setMotion(seed.motion); setIcp(seed.icp); setAsk(seed.ask); setSettings(seed.defaults)
                 }}>

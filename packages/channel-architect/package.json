@@ -4,12 +4,17 @@
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
+  "types": "./src/index.ts",
   "description": "Partner program design and governed versioning for Open Mercato.",
   "scripts": {
     "build": "node build.mjs"
   },
   "exports": {
     ".": "./dist/index.js",
+    "./modules/channel_architect/backend/channel-architect/page": {
+      "types": "./src/modules/channel_architect/backend/channel-architect/page.tsx",
+      "default": "./dist/modules/channel_architect/backend/channel-architect/page.js"
+    },
     "./*": {
       "types": "./src/*.ts",
       "default": "./dist/*.js"
@@ -29,6 +34,11 @@
     "./*/*/*/*/*": {
       "types": ["./src/*/*/*/*/*.ts", "./src/*/*/*/*/*.tsx"],
       "default": "./dist/*/*/*/*/*.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "*": ["src/*"]
     }
   },
   "peerDependencies": {
