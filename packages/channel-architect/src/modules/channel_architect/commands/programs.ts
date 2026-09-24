@@ -123,6 +123,15 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       organizationId: raw.organizationId,
     })
     if (!version) throw notFound('Program version not found')
+    const program = await em.findOne(ChannelArchitectProgram, {
+      id: version.programId,
+      tenantId: raw.tenantId,
+      organizationId: raw.organizationId,
+    })
+    if (!program) throw notFound('Program not found')
+    if (program.ownerUserId === actorId || version.createdBy === actorId) {
+      throw new CrudHttpError(403, { error: 'The program owner or version creator cannot review their own version.' })
+    }
     const existing = await em.findOne(ChannelArchitectProgramReview, {
       programVersionId: version.id,
       tenantId: raw.tenantId,

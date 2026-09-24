@@ -54,7 +54,8 @@ export async function GET(req: Request) {
   try {
     const { container, tenantId, organizationId } = await getContext(req)
     const em = container.resolve('em') as EntityManager
-    const id = new URL(req.url).searchParams.get('id')
+    const rawId = new URL(req.url).searchParams.get('id')
+    const id = rawId ? z.string().uuid().parse(rawId) : null
     if (id) {
       const program = await em.findOne(ChannelArchitectProgram, { id, tenantId, organizationId })
       if (!program) throw new CrudHttpError(404, { error: 'Program not found.' })

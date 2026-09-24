@@ -21,7 +21,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ version
     const scope = await resolveOrganizationScopeForRequest({ container, auth, request: req })
     const organizationId = scope?.selectedId ?? auth.orgId ?? null
     if (!organizationId) throw new CrudHttpError(400, { error: 'Organization context is required.' })
-    const { versionId } = await params
+    const { versionId: rawVersionId } = await params
+    const versionId = z.string().uuid().parse(rawVersionId)
     const input = programReviewSchema.parse(await req.json())
     const guard = await validateCrudMutationGuard(container, {
       tenantId: auth.tenantId,
@@ -65,6 +66,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ version
   } catch (error) {
     if (isCrudHttpError(error)) return NextResponse.json(error.body, { status: error.status })
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid review request.', issues: error.issues }, { status: 400 })
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+      return NextResponse.json({ error: 'This version already has a final review decision.' }, { status: 409 })
+    }
     console.error('[channel_architect] review POST failed', error)
     return NextResponse.json({ error: 'Unable to record review.' }, { status: 500 })
   }
@@ -78,7 +82,11 @@ export const openApi: OpenApiRouteDoc = {
       summary: 'Approve or reject a version',
       requestBody: { contentType: 'application/json', schema: programReviewSchema },
       responses: [{ status: 201, description: 'Review decision recorded', schema: z.object({ reviewId: z.string() }) }],
-      errors: [{ status: 409, description: 'A decision already exists', schema: z.object({ error: z.string() }) }],
+      errors: [
+        { status: 400, description: 'Invalid review request', schema: z.object({ error: z.string() }) },
+        { status: 403, description: 'Reviewer is not independent of the program version', schema: z.object({ error: z.string() }) },
+        { status: 409, description: 'A decision already exists', schema: z.object({ error: z.string() }) },
+      ],
     },
   },
 }

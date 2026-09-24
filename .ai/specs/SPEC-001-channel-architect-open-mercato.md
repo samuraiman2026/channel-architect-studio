@@ -50,6 +50,7 @@ Use scalar IDs between module records and other modules. Do not create cross-mod
 - `channel_architect.programs.manage`: create programs and append revisions.
 - `channel_architect.programs.approve`: record a final review decision.
 - Never trust client-supplied `tenantId`, `organizationId`, actor, reviewer, or current version values.
+- The program owner and version creator cannot review that version, even if their role includes reviewer permission.
 - Enforce organization and tenant scoping in every query and mutation, including nested version and decision lookup.
 - Domain writes go through Open Mercato commands and mutation guard conventions. Commands must preserve audit and undo behavior where the host contract supports it; immutable versions and decisions must never be rewritten during undo.
 - Treat an imported browser draft as input only. Revalidate and regenerate output on the server; do not import its claimed approval state.
