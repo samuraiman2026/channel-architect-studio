@@ -227,6 +227,17 @@ describe('Open Mercato lifecycle commands', () => {
     assert.equal(state.status, 'active')
   })
 
+  it('enforces organization scope before archive mutation', async () => {
+    const state = programState()
+    await assert.rejects(
+      async () => archiveProgram.execute({
+        programId: 'program-1', tenantId: 'tenant-1', organizationId: 'org-2', expectedVersion: 3,
+      }, commandContext(state)),
+      /Organization scope mismatch/,
+    )
+    assert.equal(state.status, 'active')
+  })
+
   it('requires an authenticated actor before archiving', async () => {
     const state = programState()
     await assert.rejects(
