@@ -26,7 +26,12 @@ type Phase = "select" | "configure" | "output";
 
 interface SavedDraft {
   id: string;
+  programId: string;
+  version: number;
   savedAt: string;
+  owner: string;
+  status: "draft" | "approved";
+  approval?: { name: string; at: string };
   scenario: Scenario;
   settings: AxisSettings;
   sections: Sections;
@@ -53,13 +58,16 @@ function ChannelArchitect() {
   const [sections, setSections] = useState<Sections | null>(null);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState("");
+  const [programId, setProgramId] = useState("");
+  const [owner, setOwner] = useState("");
+  const [activeDraftId, setActiveDraftId] = useState("");
 
   useEffect(() => {
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
       if (Array.isArray(parsed)) {
-        setDrafts(
-          parsed.filter(
+        const normalized = parsed
+          .filter(
             (item): item is SavedDraft =>
               typeof item === "object" &&
               item !== null &&
@@ -68,8 +76,16 @@ function ChannelArchitect() {
               typeof item.scenario?.label === "string" &&
               typeof item.settings?.stage === "string" &&
               typeof item.sections?.["exec-summary"] === "string",
-          ),
-        );
+          )
+          .map((item) => ({
+            ...item,
+            programId: typeof item.programId === "string" ? item.programId : item.id,
+            version: typeof item.version === "number" ? item.version : 1,
+            owner: typeof item.owner === "string" ? item.owner : "Local browser user",
+            status: item.status === "approved" ? ("approved" as const) : ("draft" as const),
+          }));
+        setDrafts(normalized);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       }
     } catch {
       setNotice("Saved drafts on this device could not be read.");
@@ -79,12 +95,16 @@ function ChannelArchitect() {
   const handleSelectScenario = (s: Scenario) => {
     setScenario(s);
     setSettings(s.defaults);
+    setProgramId(crypto.randomUUID());
+    setOwner("");
+    setActiveDraftId("");
     setPhase("configure");
   };
 
   const handleGenerate = (axisSettings: AxisSettings) => {
     if (!scenario) return;
     const errors = validateDesignInputs(scenario, axisSettings);
+    if (!owner.trim()) errors.push("A program owner is required.");
     if (errors.length) {
       setNotice(errors.join(" "));
       return;
@@ -92,14 +112,24 @@ function ChannelArchitect() {
     const output = generateDesign(scenario, axisSettings);
     setSettings(axisSettings);
     setSections(output);
+    const version =
+      Math.max(
+        0,
+        ...drafts.filter((item) => item.programId === programId).map((item) => item.version),
+      ) + 1;
     const draft: SavedDraft = {
       id: crypto.randomUUID(),
+      programId: programId || crypto.randomUUID(),
+      version,
       savedAt: new Date().toISOString(),
+      owner: owner.trim(),
+      status: "draft",
       scenario,
       settings: axisSettings,
       sections: output,
     };
-    const next = [draft, ...drafts].slice(0, 20);
+    const next = [draft, ...drafts];
+    setActiveDraftId(draft.id);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       setDrafts(next);
@@ -116,8 +146,31 @@ function ChannelArchitect() {
     setScenario(draft.scenario);
     setSettings(draft.settings);
     setSections(draft.sections);
+    setProgramId(draft.programId);
+    setOwner(draft.owner);
+    setActiveDraftId(draft.id);
     setNotice(`Opened saved draft from ${new Date(draft.savedAt).toLocaleString()}.`);
     setPhase("output");
+  };
+
+  const approveDraft = (name: string) => {
+    const active = drafts.find((item) => item.id === activeDraftId);
+    if (!active || active.status === "approved" || !name.trim()) return;
+    const updated = {
+      ...active,
+      status: "approved" as const,
+      approval: { name: name.trim(), at: new Date().toISOString() },
+    };
+    const next = drafts.map((item) => (item.id === active.id ? updated : item));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      setDrafts(next);
+      setNotice(
+        `Version ${updated.version} marked approved on this device. This is a prototype record, not an authenticated approval.`,
+      );
+    } catch {
+      setNotice("This device could not save the approval record.");
+    }
   };
 
   return (
@@ -162,6 +215,16 @@ function ChannelArchitect() {
 
         {phase === "configure" && scenario && settings && (
           <div className="max-w-[760px] mx-auto">
+            <label className="block mb-8 text-sm text-foreground">
+              Program owner *
+              <input
+                className="mt-1 w-full border border-border bg-background px-3 py-2"
+                value={owner}
+                maxLength={120}
+                onChange={(event) => setOwner(event.target.value)}
+                placeholder="Name of the person accountable for this program"
+              />
+            </label>
             <AxisControls
               scenario={scenario}
               initial={settings}
@@ -176,12 +239,17 @@ function ChannelArchitect() {
             scenario={scenario}
             settings={settings}
             sections={sections}
+            draft={drafts.find((item) => item.id === activeDraftId)}
+            onApprove={approveDraft}
             onRegenerate={() => setPhase("configure")}
             onStartOver={() => {
               setPhase("select");
               setScenario(null);
               setSettings(null);
               setSections(null);
+              setProgramId("");
+              setOwner("");
+              setActiveDraftId("");
             }}
           />
         )}
@@ -273,7 +341,9 @@ function ScenarioSelector({
         </div>
         {drafts.length > 0 && (
           <div className="max-w-[760px] mx-auto mt-12">
-            <h3 className="font-serif text-xl text-primary mb-3">Saved drafts on this device</h3>
+            <h3 className="font-serif text-xl text-primary mb-3">
+              Saved program versions on this device
+            </h3>
             <ul className="space-y-2">
               {drafts.map((draft) => (
                 <li key={draft.id}>
@@ -282,7 +352,8 @@ function ScenarioSelector({
                     onClick={() => onOpenDraft(draft)}
                     className="text-left underline underline-offset-4 text-primary"
                   >
-                    {draft.scenario.label} · {new Date(draft.savedAt).toLocaleString()}
+                    {draft.scenario.label} · v{draft.version} · {draft.status} · {draft.owner} ·{" "}
+                    {new Date(draft.savedAt).toLocaleString()}
                   </button>
                 </li>
               ))}
@@ -298,15 +369,20 @@ function OutputView({
   scenario,
   settings,
   sections,
+  draft,
+  onApprove,
   onRegenerate,
   onStartOver,
 }: {
   scenario: Scenario;
   settings: AxisSettings;
   sections: Sections;
+  draft?: SavedDraft;
+  onApprove: (name: string) => void;
   onRegenerate: () => void;
   onStartOver: () => void;
 }) {
+  const [reviewer, setReviewer] = useState("");
   return (
     <div className="max-w-[760px] mx-auto">
       <div
@@ -315,6 +391,51 @@ function OutputView({
       >
         <div className="flex-1">
           <ScenarioSummary scenario={scenario} settings={settings} />
+          {draft && (
+            <div className="mt-3 border border-border bg-card p-4 text-sm">
+              <div className="flex flex-wrap gap-x-5 gap-y-1">
+                <span>
+                  Owner: <strong>{draft.owner}</strong>
+                </span>
+                <span>
+                  Version: <strong>v{draft.version}</strong>
+                </span>
+                <span>
+                  Status: <strong>{draft.status}</strong>
+                </span>
+              </div>
+              {draft.approval && (
+                <p className="mt-2 text-muted-foreground">
+                  Recorded by {draft.approval.name} · {new Date(draft.approval.at).toLocaleString()}
+                </p>
+              )}
+              {draft.status !== "approved" && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Prototype only: this browser record does not verify identity or permission.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      aria-label="Reviewer name"
+                      className="min-w-0 flex-1 border border-border bg-background px-3 py-2"
+                      value={reviewer}
+                      maxLength={120}
+                      onChange={(event) => setReviewer(event.target.value)}
+                      placeholder="Reviewer name"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onApprove(reviewer)}
+                      disabled={!reviewer.trim()}
+                      className="bg-primary text-primary-foreground px-4 py-2 disabled:opacity-40"
+                    >
+                      Record local approval
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           <button
