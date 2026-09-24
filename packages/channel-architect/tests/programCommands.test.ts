@@ -29,7 +29,12 @@ function commandContext(
   state: ReturnType<typeof programState>,
   afterRead?: () => void,
   actorId: string | null = 'user-1',
-  options: { versionNumber?: number; versionCreator?: string; reviews?: Record<string, unknown>[] } = {},
+  options: {
+    versionNumber?: number
+    versionCreator?: string
+    reviews?: Record<string, unknown>[]
+    persistedVersions?: Record<string, unknown>[]
+  } = {},
   services: Record<string, unknown> = {},
 ) {
   const version = {
@@ -70,8 +75,11 @@ function commandContext(
     async flush() {},
     create(entity: unknown, data: Record<string, unknown>) { return { ...data, entity } },
     persist(value: unknown) {
-      if (value && typeof value === 'object' && 'entity' in value && value.entity === ChannelArchitectProgramReview) {
-        reviews.push(value as Record<string, unknown>)
+      const rows = Array.isArray(value) ? value : [value]
+      for (const row of rows) {
+        if (!row || typeof row !== 'object' || !('entity' in row)) continue
+        if (row.entity === ChannelArchitectProgramReview) reviews.push(row as Record<string, unknown>)
+        if (row.entity === ChannelArchitectProgramVersion) options.persistedVersions?.push(row as Record<string, unknown>)
       }
     },
   }
@@ -214,6 +222,21 @@ describe('Open Mercato lifecycle commands', () => {
       }, commandContext(state)),
       /Archived programs cannot be revised/,
     )
+  })
+
+  it('rejects a competing revision without persisting a duplicate version', async () => {
+    const state = programState()
+    const scenario = SCENARIO_LIST[0]
+    const persistedVersions: Record<string, unknown>[] = []
+    await assert.rejects(
+      async () => reviseProgram.execute({
+        programId: 'program-1', tenantId: 'tenant-1', organizationId: 'org-1', expectedVersion: 3,
+        scenario, settings: scenario.defaults,
+      }, commandContext(state, () => { state.currentVersionNumber = 4 }, 'user-1', { persistedVersions })),
+      /Program changed. Reload the latest version before revising/,
+    )
+    assert.equal(state.currentVersionNumber, 4)
+    assert.equal(persistedVersions.length, 0)
   })
 
   it('enforces tenant scope before archive mutation', async () => {
