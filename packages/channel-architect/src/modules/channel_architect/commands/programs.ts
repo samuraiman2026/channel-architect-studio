@@ -122,6 +122,7 @@ const archiveProgram: CommandHandler<ArchiveProgramInput, { programId: string; s
     const parsed = programArchiveSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
     ensureOrganizationScope(ctx, raw.organizationId)
+    if (!ctx.auth?.sub) throw new CrudHttpError(401, { error: 'Authenticated actor is required to archive a program.' })
     const em = (ctx.container.resolve('em') as EntityManager).fork()
     const program = await em.findOne(ChannelArchitectProgram, {
       id: raw.programId,

@@ -16,7 +16,7 @@ function programState(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function commandContext(state: ReturnType<typeof programState>, afterRead?: () => void) {
+function commandContext(state: ReturnType<typeof programState>, afterRead?: () => void, actorId: string | null = 'user-1') {
   const em = {
     fork() { return this },
     async findOne(_entity: unknown, where: Record<string, unknown>) {
@@ -39,7 +39,7 @@ function commandContext(state: ReturnType<typeof programState>, afterRead?: () =
     persist() {},
   }
   return {
-    auth: { tenantId: 'tenant-1', sub: 'user-1' },
+    auth: { tenantId: 'tenant-1', sub: actorId },
     selectedOrganizationId: 'org-1',
     organizationIds: ['org-1'],
     container: { resolve: () => em },
@@ -99,6 +99,17 @@ describe('program lifecycle commands', () => {
         programId: 'program-1', tenantId: 'tenant-2', organizationId: 'org-1', expectedVersion: 3,
       }, commandContext(state)),
       /Tenant scope mismatch/,
+    )
+    assert.equal(state.status, 'active')
+  })
+
+  it('requires an authenticated actor before archiving', async () => {
+    const state = programState()
+    await assert.rejects(
+      async () => archiveProgram.execute({
+        programId: 'program-1', tenantId: 'tenant-1', organizationId: 'org-1', expectedVersion: 3,
+      }, commandContext(state, undefined, null)),
+      /Authenticated actor is required to archive a program/,
     )
     assert.equal(state.status, 'active')
   })

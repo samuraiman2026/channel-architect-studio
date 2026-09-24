@@ -120,6 +120,7 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
     const parsed = pilotStatusUpdateSchema.parse(raw.input)
     ensureTenantScope(ctx, raw.tenantId)
     ensureOrganizationScope(ctx, raw.organizationId)
+    if (!ctx.auth?.sub) throw new CrudHttpError(401, { error: 'Authenticated actor is required to update a pilot.' })
     const em = (ctx.container.resolve('em') as EntityManager).fork()
     const pilot = await em.findOne(ChannelArchitectPilot, {
       id: raw.pilotId,
@@ -165,6 +166,7 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
     const parsed = pilotCheckpointUpdateSchema.parse(raw.input)
     ensureTenantScope(ctx, raw.tenantId)
     ensureOrganizationScope(ctx, raw.organizationId)
+    if (!ctx.auth?.sub) throw new CrudHttpError(401, { error: 'Authenticated actor is required to update a checkpoint.' })
     const em = (ctx.container.resolve('em') as EntityManager).fork()
     const pilot = await em.findOne(ChannelArchitectPilot, {
       id: raw.pilotId,
