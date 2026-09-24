@@ -52,6 +52,7 @@ type Pilot = {
 
 const API = '/api/channel_architect/programs'
 const PILOT_API = '/api/channel_architect/pilots'
+const PILOT_PAGE_SIZE = 25
 const initialPreset = SCENARIO_LIST[0]
 const ARCHETYPES: Archetype[] = ['SI / Consulting', 'ISV', 'VAR', 'MSP', 'Referral / Agency', 'Marketplace']
 const ECONOMIC_AXES = [
@@ -87,6 +88,8 @@ export default function ChannelArchitectProgramsPage() {
   const [loading, setLoading] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
   const [pilots, setPilots] = React.useState<Pilot[]>([])
+  const [pilotPage, setPilotPage] = React.useState(1)
+  const [pilotTotalCount, setPilotTotalCount] = React.useState(0)
   const [pilotName, setPilotName] = React.useState('')
   const [cohortLabel, setCohortLabel] = React.useState('')
   const [pilotStartDate, setPilotStartDate] = React.useState('')
@@ -99,6 +102,9 @@ export default function ChannelArchitectProgramsPage() {
   const canStartPilot = Boolean(selectedVersion && selectedReview?.decision === 'approved' && selectedVersion.versionNumber === detail?.program.currentVersionNumber)
   const economicTotal = Object.values(settings.economics).reduce((total, value) => total + value, 0)
   const canSaveDesign = economicTotal === 100 && settings.primaryArchetypes.length > 0
+  const pilotPageCount = Math.max(1, Math.ceil(pilotTotalCount / PILOT_PAGE_SIZE))
+  const firstPilotNumber = pilotTotalCount === 0 ? 0 : (pilotPage - 1) * PILOT_PAGE_SIZE + 1
+  const lastPilotNumber = Math.min(pilotPage * PILOT_PAGE_SIZE, pilotTotalCount)
 
   function toggleArchetype(group: 'primaryArchetypes' | 'secondaryArchetypes', archetype: Archetype) {
     setSettings((current) => ({
@@ -129,12 +135,16 @@ export default function ChannelArchitectProgramsPage() {
 
   React.useEffect(() => { void refreshPrograms() }, [refreshPrograms])
 
-  const refreshPilots = React.useCallback(async () => {
-    const response = await apiCall(PILOT_API, undefined, {})
+  const refreshPilots = React.useCallback(async (page = pilotPage) => {
+    const response = await apiCall(`${PILOT_API}?page=${page}&pageSize=${PILOT_PAGE_SIZE}`, undefined, {})
     if (response.ok && response.result) {
-      setPilots(((response.result as { items?: Pilot[] }).items ?? []))
+      const result = response.result as { items?: Pilot[]; totalCount?: number }
+      setPilots(result.items ?? [])
+      setPilotTotalCount(result.totalCount ?? 0)
+    } else {
+      setNotice(messageFrom(response.result, 'Unable to load partner pilots.'))
     }
-  }, [])
+  }, [pilotPage])
 
   React.useEffect(() => { void refreshPilots() }, [refreshPilots])
 
@@ -267,7 +277,8 @@ export default function ChannelArchitectProgramsPage() {
     setPilotEndDate('')
     setCheckpointDrafts([{ title: '', dueDate: '' }])
     setNotice('Pilot and checkpoints created from the approved version.')
-    await refreshPilots()
+    if (pilotPage === 1) await refreshPilots(1)
+    else setPilotPage(1)
   }
 
   async function updatePilot(pilot: Pilot, status: 'active' | 'paused' | 'completed' | 'cancelled', outcome?: 'continue' | 'revise' | 'stop') {
@@ -468,7 +479,15 @@ export default function ChannelArchitectProgramsPage() {
           </div>
 
           <section className="space-y-3 rounded-lg border bg-card p-4">
-            <div><h2 className="font-medium">Pilots</h2><p className="mt-1 text-sm text-muted-foreground">Each pilot is tied to an approved program version. Completion requires a continue, revise, or stop decision.</p></div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div><h2 className="font-medium">Pilots</h2><p className="mt-1 text-sm text-muted-foreground">Each pilot is tied to an approved program version. Completion requires a continue, revise, or stop decision.</p></div>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">Showing {firstPilotNumber}–{lastPilotNumber} of {pilotTotalCount}</span>
+                <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Previous pilots page" disabled={pilotPage <= 1} onClick={() => setPilotPage((page) => Math.max(1, page - 1))}>Previous</button>
+                <span aria-live="polite">Page {pilotPage} of {pilotPageCount}</span>
+                <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Next pilots page" disabled={pilotPage >= pilotPageCount} onClick={() => setPilotPage((page) => Math.min(pilotPageCount, page + 1))}>Next</button>
+              </div>
+            </div>
             {pilots.length === 0 ? <p className="text-sm text-muted-foreground">No pilots yet. Approve the current version of a program to start one.</p> : (
               <ul className="space-y-3">
                 {pilots.map((pilot) => <li key={pilot.id} className="rounded-md border p-3">
