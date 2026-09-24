@@ -5,7 +5,7 @@ import type { AxisSettings, Scenario, Sections } from '../lib/types'
 @Entity({ tableName: 'channel_architect_programs' })
 @Index({ name: 'channel_architect_program_scope_idx', properties: ['tenantId', 'organizationId', 'updatedAt'] })
 export class ChannelArchitectProgram {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'status' | 'isActive'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -48,7 +48,7 @@ export class ChannelArchitectProgram {
 @Index({ name: 'channel_architect_version_scope_idx', properties: ['tenantId', 'organizationId', 'programId'] })
 @Unique({ name: 'channel_architect_program_version_number_uq', properties: ['programId', 'versionNumber'] })
 export class ChannelArchitectProgramVersion {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'isActive'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -97,7 +97,7 @@ export class ChannelArchitectProgramVersion {
 @Index({ name: 'channel_architect_review_scope_idx', properties: ['tenantId', 'organizationId', 'programVersionId'] })
 @Unique({ name: 'channel_architect_program_review_version_uq', properties: ['programVersionId'] })
 export class ChannelArchitectProgramReview {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'isActive'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -137,7 +137,7 @@ export class ChannelArchitectProgramReview {
 @Index({ name: 'channel_architect_pilot_scope_idx', properties: ['tenantId', 'organizationId', 'updatedAt'] })
 @Index({ name: 'channel_architect_pilot_version_idx', properties: ['programVersionId'] })
 export class ChannelArchitectPilot {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'status' | 'isActive'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -192,7 +192,7 @@ export class ChannelArchitectPilot {
 @Index({ name: 'channel_architect_checkpoint_scope_idx', properties: ['tenantId', 'organizationId', 'pilotId'] })
 @Unique({ name: 'channel_architect_checkpoint_order_uq', properties: ['pilotId', 'sortOrder'] })
 export class ChannelArchitectPilotCheckpoint {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'status' | 'isActive'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string

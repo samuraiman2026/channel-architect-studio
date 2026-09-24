@@ -5,6 +5,7 @@ import { Page, PageBody } from '@open-mercato/ui/backend/Page'
 import { apiCall } from '@open-mercato/ui/backend/utils/apiCall'
 import { SCENARIO_LIST } from '../../lib/scenarios'
 import type { AxisSettings, Scenario, Sections } from '../../lib/types'
+import { getProgramVersionStateLabel } from '../../lib/programVersionState'
 
 type Program = {
   id: string
@@ -332,9 +333,13 @@ export default function ChannelArchitectProgramsPage() {
                     <button className="rounded-md border px-3 py-2 text-sm" onClick={beginRevision}>Create revision</button>
                   </header>
                   <div className="flex flex-wrap gap-2">
-                    {detail.versions.map((version) => <button key={version.id} className={`rounded border px-3 py-1.5 text-sm ${selectedVersion.id === version.id ? 'border-primary bg-muted' : ''}`} onClick={() => setSelectedVersionId(version.id)}>
-                      v{version.versionNumber}{detail.reviews.find((review) => review.programVersionId === version.id) ? ` · ${detail.reviews.find((review) => review.programVersionId === version.id)?.decision}` : ' · pending review'}
-                    </button>)}
+                    {detail.versions.map((version) => {
+                      const review = detail.reviews.find((item) => item.programVersionId === version.id)
+                      const stateLabel = getProgramVersionStateLabel(version.versionNumber, detail.program.currentVersionNumber, review?.decision)
+                      return <button key={version.id} className={`rounded border px-3 py-1.5 text-sm ${selectedVersion.id === version.id ? 'border-primary bg-muted' : ''}`} onClick={() => setSelectedVersionId(version.id)}>
+                        v{version.versionNumber} · {stateLabel}
+                      </button>
+                    })}
                   </div>
                   <div className="rounded-md border p-3 text-sm">
                     <p><strong>{selectedVersion.scenarioSnapshot.label}</strong> · engine {selectedVersion.engineVersion}</p>
