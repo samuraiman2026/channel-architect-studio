@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { SCENARIO_LIST } from '../../src/modules/channel_architect/lib/scenarios'
+import { SCENARIO_LIST } from '../lib/scenarios'
 
 type Role = 'superadmin' | 'admin' | 'employee'
 type ProgramCreated = { programId: string; versionId: string; version: number }

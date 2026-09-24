@@ -16,7 +16,9 @@ async function collect(directory) {
   return files
 }
 
-const entryPoints = (await collect(join(root, 'src'))).filter((file) => /\.tsx?$/.test(file))
+const entryPoints = (await collect(join(root, 'src'))).filter((file) =>
+  /\.tsx?$/.test(file) && !file.split(/[\\/]/).includes('__integration__'),
+)
 await esbuild.build({
   entryPoints,
   outbase: join(root, 'src'),
