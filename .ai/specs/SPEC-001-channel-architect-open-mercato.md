@@ -13,6 +13,8 @@ The module now has a host-discoverable Playwright acceptance scenario in `packag
 
 The scenario also creates a second organization and verifies that a reviewer with program permissions in the primary organization cannot list, retrieve, revise, or review a guessed program ID from the other organization. This check is prepared but remains unexecuted until the module is wired into a host with its migration applied.
 
+The backend workspace now paginates, searches, and filters programs and pilots. Pilot rows resolve their linked program name and immutable version number. Mutation controls reflect Open Mercato feature grants, and review controls are withheld from the program owner and version creator; server authorization remains authoritative. The acceptance scenario covers these UI permissions and list filters. The standalone Studio production build, strict host-module/acceptance typecheck, and 36 focused tests pass. The remaining gate is running the acceptance scenario against the installed host with the migration applied to a fresh disposable database.
+
 ## Outcome
 
 Evolve Channel Architect Studio from a single-browser planning prototype into an installable Open Mercato module for designing, versioning, and reviewing partner programs. Preserve the standalone Studio experience while making one deterministic design engine the source of truth.
