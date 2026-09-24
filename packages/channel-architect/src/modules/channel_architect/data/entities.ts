@@ -28,6 +28,12 @@ export class ChannelArchitectProgram {
   @Property({ name: 'current_version_number', type: 'integer', default: 0 })
   currentVersionNumber = 0
 
+  @Property({ name: 'is_active', type: 'boolean', default: true })
+  isActive = true
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt: Date | null = null
+
   @Property({ name: 'created_by', type: 'text' })
   createdBy!: string
 
@@ -42,7 +48,7 @@ export class ChannelArchitectProgram {
 @Index({ name: 'channel_architect_version_scope_idx', properties: ['tenantId', 'organizationId', 'programId'] })
 @Unique({ name: 'channel_architect_program_version_number_uq', properties: ['programId', 'versionNumber'] })
 export class ChannelArchitectProgramVersion {
-  [OptionalProps]?: 'createdAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -76,13 +82,22 @@ export class ChannelArchitectProgramVersion {
 
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
+
+  @Property({ name: 'updated_at', type: Date, onCreate: () => new Date() })
+  updatedAt: Date = new Date()
+
+  @Property({ name: 'is_active', type: 'boolean', default: true })
+  isActive = true
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt: Date | null = null
 }
 
 @Entity({ tableName: 'channel_architect_program_reviews' })
 @Index({ name: 'channel_architect_review_scope_idx', properties: ['tenantId', 'organizationId', 'programVersionId'] })
 @Unique({ name: 'channel_architect_program_review_version_uq', properties: ['programVersionId'] })
 export class ChannelArchitectProgramReview {
-  [OptionalProps]?: 'createdAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -107,6 +122,15 @@ export class ChannelArchitectProgramReview {
 
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
+
+  @Property({ name: 'updated_at', type: Date, onCreate: () => new Date() })
+  updatedAt: Date = new Date()
+
+  @Property({ name: 'is_active', type: 'boolean', default: true })
+  isActive = true
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt: Date | null = null
 }
 
 @Entity({ tableName: 'channel_architect_pilots' })

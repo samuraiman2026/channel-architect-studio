@@ -1,4 +1,4 @@
-import './commands'
+import './commands/index.js'
 
 export const metadata = {
   id: 'channel_architect',

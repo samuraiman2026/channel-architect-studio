@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild'
-import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,7 +11,7 @@ async function collect(directory) {
   for (const entry of entries) {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) files.push(...await collect(path))
-    else if (/\.(?:tsx?|js)$/.test(entry.name)) files.push(path)
+    else if (/\.(?:tsx?|js|json)$/.test(entry.name)) files.push(path)
   }
   return files
 }
@@ -41,6 +41,15 @@ for (const file of await collect(join(root, 'dist'))) {
     /\.(?:js|json)$/.test(path) ? match : `${before}${path}.js${after}`,
   )
   await writeFile(file, content)
+}
+
+for (const file of await collect(join(root, 'src'))) {
+  const relativePath = relative(join(root, 'src'), file)
+  const isSchemaDiscoveryFile = /(^|[/\\])(?:entities|schema)\.ts$/.test(relativePath)
+  if (!file.endsWith('.json') && !isSchemaDiscoveryFile) continue
+  const outputPath = join(root, 'dist', relativePath)
+  await mkdir(dirname(outputPath), { recursive: true })
+  await copyFile(file, outputPath)
 }
 
 console.log(`Built ${entryPoints.length} Channel Architect module files from ${relative(process.cwd(), resolve(root, 'src'))}.`)

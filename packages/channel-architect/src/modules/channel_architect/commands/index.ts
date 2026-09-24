@@ -1,2 +1,2 @@
-import './programs'
-import './pilots'
+import './programs.js'
+import './pilots.js'
