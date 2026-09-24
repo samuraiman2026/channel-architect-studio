@@ -19,6 +19,7 @@ import {
 } from '../data/validators'
 import { canCompletePilot, canUpdatePilotCheckpoints, isPilotTransitionAllowed, type PilotStatus } from '../lib/pilotState'
 import { ensureOrganizationScope, ensureTenantScope } from './scope'
+import { buildChannelArchitectAuditLog } from './audit'
 
 type PilotScope = { tenantId: string; organizationId: string }
 type CreatePilotInput = PilotScope & { input: unknown }
@@ -27,6 +28,7 @@ type UpdateCheckpointInput = PilotScope & { pilotId: string; checkpointId: strin
 
 const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpointIds: string[] }> = {
   id: 'channel_architect.pilots.create',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = pilotCreateSchema.parse(raw.input)
     ensureTenantScope(ctx, raw.tenantId)
@@ -112,10 +114,26 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
     }], { transaction: true })
     return { pilotId, checkpointIds: checkpoints.map((checkpoint) => checkpoint.id) }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Create partner program pilot',
+    resourceKind: 'channel_architect.pilot',
+    resourceId: result.pilotId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    relatedResourceKind: 'channel_architect.program_version',
+    relatedResourceId: (input.input as { programVersionId: string }).programVersionId,
+    payload: {
+      pilotId: result.pilotId,
+      programVersionId: (input.input as { programVersionId: string }).programVersionId,
+      checkpointIds: result.checkpointIds,
+    },
+  }),
 }
 
 const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; status: string; outcome: string | null }> = {
   id: 'channel_architect.pilots.update_status',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = pilotStatusUpdateSchema.parse(raw.input)
     ensureTenantScope(ctx, raw.tenantId)
@@ -158,10 +176,20 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
     if (updated !== 1) throw new CrudHttpError(409, { error: 'Pilot changed. Reload it before updating its status.' })
     return { pilotId: pilot.id, status: parsed.status, outcome }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Update partner program pilot status',
+    resourceKind: 'channel_architect.pilot',
+    resourceId: result.pilotId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    payload: { pilotId: result.pilotId, status: result.status, outcome: result.outcome },
+  }),
 }
 
 const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointId: string; status: string }> = {
   id: 'channel_architect.pilots.update_checkpoint',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = pilotCheckpointUpdateSchema.parse(raw.input)
     ensureTenantScope(ctx, raw.tenantId)
@@ -207,6 +235,17 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
     if (updated !== 1) throw new CrudHttpError(409, { error: 'Checkpoint changed. Reload the pilot before updating it.' })
     return { checkpointId: checkpoint.id, status: parsed.status }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Update partner pilot checkpoint',
+    resourceKind: 'channel_architect.pilot_checkpoint',
+    resourceId: result.checkpointId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    relatedResourceKind: 'channel_architect.pilot',
+    relatedResourceId: input.pilotId,
+    payload: { pilotId: input.pilotId, checkpointId: result.checkpointId, status: result.status },
+  }),
 }
 
 registerCommand(createPilot)

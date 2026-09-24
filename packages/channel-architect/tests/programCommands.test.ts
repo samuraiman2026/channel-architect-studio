@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { archiveProgram, reviseProgram, reviewProgram } from '../src/modules/channel_architect/commands/programs'
+import { archiveProgram, createProgram, reviseProgram, reviewProgram } from '../src/modules/channel_architect/commands/programs'
 import { createPilot, updatePilotCheckpoint, updatePilotStatus } from '../src/modules/channel_architect/commands/pilots'
 import {
   ChannelArchitectProgram,
@@ -277,6 +277,38 @@ describe('Open Mercato lifecycle commands', () => {
       /already has a final review decision/,
     )
     assert.equal(state.status, 'draft')
+  })
+
+  it('audits every lifecycle mutation without making immutable actions undoable or logging free text', async () => {
+    const commands = [createProgram, reviseProgram, archiveProgram, reviewProgram, createPilot, updatePilotStatus, updatePilotCheckpoint]
+    assert.ok(commands.every((command) => command.isUndoable === false && typeof command.buildLog === 'function'))
+
+    const reviewAudit = await reviewProgram.buildLog?.({
+      input: {
+        tenantId: 'tenant-1', organizationId: 'org-1', programVersionId: 'version-1',
+        decision: 'approved', rationale: 'Private reviewer note',
+      },
+      result: { reviewId: 'review-1' },
+      ctx: commandContext(programState()),
+      snapshots: {},
+    })
+    assert.equal(reviewAudit?.resourceKind, 'channel_architect.program_version')
+    assert.deepEqual(reviewAudit?.payload, { programVersionId: 'version-1', reviewId: 'review-1', decision: 'approved' })
+    assert.equal(JSON.stringify(reviewAudit).includes('Private reviewer note'), false)
+
+    const pilotAudit = await createPilot.buildLog?.({
+      input: {
+        tenantId: 'tenant-1', organizationId: 'org-1',
+        input: { programVersionId: 'version-1', name: 'Pilot', cohortLabel: 'Cohort', checkpoints: [{ title: 'Kickoff' }] },
+      },
+      result: { pilotId: 'pilot-1', checkpointIds: ['checkpoint-1'] },
+      ctx: commandContext(programState()),
+      snapshots: {},
+    })
+    assert.deepEqual(pilotAudit?.payload, {
+      pilotId: 'pilot-1', programVersionId: 'version-1', checkpointIds: ['checkpoint-1'],
+    })
+    assert.equal(JSON.stringify(pilotAudit).includes('Cohort'), false)
   })
 
   it('creates a pilot only from the approved current version and persists its checkpoints', async () => {

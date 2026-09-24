@@ -17,6 +17,7 @@ import {
   programReviewSchema,
 } from '../data/validators'
 import { ensureOrganizationScope, ensureTenantScope } from './scope'
+import { buildChannelArchitectAuditLog } from './audit'
 
 type ProgramScope = { tenantId: string; organizationId: string }
 type CreateProgramInput = ProgramScope & { name: string; scenario: unknown; settings: unknown }
@@ -26,6 +27,7 @@ type ReviewProgramInput = ProgramScope & { programVersionId: string; decision: '
 
 const createProgram: CommandHandler<CreateProgramInput, { programId: string; versionId: string; version: number }> = {
   id: 'channel_architect.programs.create',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = programCreateSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
@@ -62,10 +64,22 @@ const createProgram: CommandHandler<CreateProgramInput, { programId: string; ver
     await withAtomicFlush(em, [async () => { em.persist([program, version]) }], { transaction: true })
     return { programId: program.id, versionId: version.id, version: 1 }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Create partner program',
+    resourceKind: 'channel_architect.program',
+    resourceId: result.programId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    relatedResourceKind: 'channel_architect.program_version',
+    relatedResourceId: result.versionId,
+    payload: { programId: result.programId, versionId: result.versionId, version: result.version },
+  }),
 }
 
 const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; version: number }> = {
   id: 'channel_architect.programs.revise',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = programRevisionSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
@@ -114,10 +128,22 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
     }], { transaction: true })
     return { versionId: version.id, version: nextVersion }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Revise partner program',
+    resourceKind: 'channel_architect.program',
+    resourceId: input.programId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    relatedResourceKind: 'channel_architect.program_version',
+    relatedResourceId: result.versionId,
+    payload: { programId: input.programId, versionId: result.versionId, version: result.version },
+  }),
 }
 
 const archiveProgram: CommandHandler<ArchiveProgramInput, { programId: string; status: 'archived' }> = {
   id: 'channel_architect.programs.archive',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = programArchiveSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
@@ -148,10 +174,20 @@ const archiveProgram: CommandHandler<ArchiveProgramInput, { programId: string; s
     }], { transaction: true })
     return { programId: program.id, status: 'archived' }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: 'Archive partner program',
+    resourceKind: 'channel_architect.program',
+    resourceId: result.programId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    payload: { programId: result.programId, status: result.status },
+  }),
 }
 
 const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = {
   id: 'channel_architect.programs.review',
+  isUndoable: false,
   async execute(raw, ctx) {
     const parsed = programReviewSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
@@ -212,6 +248,17 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
     }], { transaction: true })
     return { reviewId: review.id }
   },
+  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
+    actionLabel: `${input.decision === 'approved' ? 'Approve' : 'Reject'} partner program version`,
+    resourceKind: 'channel_architect.program_version',
+    resourceId: input.programVersionId,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    actorUserId: ctx.auth?.sub ?? null,
+    relatedResourceKind: 'channel_architect.program_review',
+    relatedResourceId: result.reviewId,
+    payload: { programVersionId: input.programVersionId, reviewId: result.reviewId, decision: input.decision },
+  }),
 }
 
 registerCommand(createProgram)
