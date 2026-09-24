@@ -3,6 +3,7 @@ import { LockMode } from '@mikro-orm/core'
 import { registerCommand } from '@open-mercato/shared/lib/commands'
 import type { CommandHandler } from '@open-mercato/shared/lib/commands'
 import type { EntityManager } from '@mikro-orm/postgresql'
+import type { z } from 'zod'
 import { CrudHttpError, notFound } from '@open-mercato/shared/lib/crud/errors'
 import { withAtomicFlush } from '@open-mercato/shared/lib/commands/flush'
 import {
@@ -22,7 +23,7 @@ import { ensureOrganizationScope, ensureTenantScope } from './scope'
 import { buildChannelArchitectAuditLog } from './audit'
 
 type PilotScope = { tenantId: string; organizationId: string }
-type CreatePilotInput = PilotScope & { input: unknown }
+type CreatePilotInput = PilotScope & z.infer<typeof pilotCreateSchema>
 type UpdatePilotInput = PilotScope & { pilotId: string; input: unknown }
 type UpdateCheckpointInput = PilotScope & { pilotId: string; checkpointId: string; input: unknown }
 
@@ -30,7 +31,7 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
   id: 'channel_architect.pilots.create',
   isUndoable: false,
   async execute(raw, ctx) {
-    const parsed = pilotCreateSchema.parse(raw.input)
+    const parsed = pilotCreateSchema.parse(raw)
     ensureTenantScope(ctx, raw.tenantId)
     ensureOrganizationScope(ctx, raw.organizationId)
     const actorId = ctx.auth?.sub
@@ -122,10 +123,10 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
     organizationId: input.organizationId,
     actorUserId: ctx.auth?.sub ?? null,
     relatedResourceKind: 'channel_architect.program_version',
-    relatedResourceId: (input.input as { programVersionId: string }).programVersionId,
+    relatedResourceId: input.programVersionId,
     payload: {
       pilotId: result.pilotId,
-      programVersionId: (input.input as { programVersionId: string }).programVersionId,
+      programVersionId: input.programVersionId,
       checkpointIds: result.checkpointIds,
     },
   }),

@@ -339,7 +339,7 @@ describe('Open Mercato lifecycle commands', () => {
     const pilotAudit = await createPilot.buildLog?.({
       input: {
         tenantId: 'tenant-1', organizationId: 'org-1',
-        input: { programVersionId: 'version-1', name: 'Pilot', cohortLabel: 'Cohort', checkpoints: [{ title: 'Kickoff' }] },
+        programVersionId: 'version-1', name: 'Pilot', cohortLabel: 'Cohort', checkpoints: [{ title: 'Kickoff' }],
       },
       result: { pilotId: 'pilot-1', checkpointIds: ['checkpoint-1'] },
       ctx: commandContext(programState()),
@@ -374,11 +374,9 @@ describe('Open Mercato lifecycle commands', () => {
     const ctx = pilotCommandContext({ reviewDecision: 'approved' })
     const result = await createPilot.execute({
       tenantId: 'tenant-1', organizationId: 'org-1',
-      input: {
-        programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
-        targetStartDate: '2026-10-01', targetEndDate: '2026-11-01',
-        checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
-      },
+      programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
+      targetStartDate: '2026-10-01', targetEndDate: '2026-11-01',
+      checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
     }, ctx.runtime)
 
     assert.ok(result.pilotId)
@@ -390,10 +388,8 @@ describe('Open Mercato lifecycle commands', () => {
     await assert.rejects(
       async () => createPilot.execute({
         tenantId: 'tenant-1', organizationId: 'org-1',
-        input: {
-          programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
-          targetStartDate: '2026-10-01', checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
-        },
+        programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
+        targetStartDate: '2026-10-01', checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
       }, pilotCommandContext({ reviewDecision: 'rejected' }).runtime),
       /only start from an approved program version/,
     )
@@ -403,10 +399,8 @@ describe('Open Mercato lifecycle commands', () => {
     await assert.rejects(
       async () => createPilot.execute({
         tenantId: 'tenant-1', organizationId: 'org-1',
-        input: {
-          programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
-          targetStartDate: '2026-10-01', checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
-        },
+        programVersionId: 'a5892d87-b14c-4595-9e69-2b289c0cc610', name: 'Q4 partner pilot', cohortLabel: 'Q4 cohort',
+        targetStartDate: '2026-10-01', checkpoints: [{ title: 'Kickoff', dueDate: '2026-10-03' }],
       }, pilotCommandContext({ reviewDecision: 'approved', nextVersionAfterInitialRead: 2 }).runtime),
       /changed while the pilot was being created/,
     )

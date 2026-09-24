@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, request, test, type Page } from '@playwright/test'
 import { SCENARIO_LIST } from '../lib/scenarios'
 
 type Role = 'superadmin' | 'admin' | 'employee'
@@ -22,6 +22,7 @@ async function login(page: Page, role: Role) {
   await page.getByLabel('Password').fill(credentials[role].password)
   await page.getByLabel('Password').press('Enter')
   await page.waitForURL(/\/backend(?:\?.*)?$/)
+  await page.waitForLoadState('domcontentloaded')
 }
 
 function dateFromNow(days: number) {
@@ -77,7 +78,10 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     await expect(page.getByRole('button', { name: 'Approve version' })).toHaveCount(0)
 
     const organizationResponse = await page.request.post('/api/directory/organizations', {
-      data: { name: `${programName} separate organization` },
+      data: {
+        name: `${programName} separate organization`,
+        tenantId: initialDetail.program.tenantId,
+      },
     })
     expect(organizationResponse.status()).toBe(201)
     const foreignOrganization = await organizationResponse.json() as OrganizationCreated
@@ -96,7 +100,11 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       foreignProgram = await foreignProgramResponse.json() as ProgramCreated
     } finally {
       if (previousOrganizationCookie) await page.context().addCookies([previousOrganizationCookie])
-      else await page.context().clearCookies({ name: 'om_selected_org' })
+      else await page.context().addCookies([{
+        name: 'om_selected_org',
+        value: initialDetail.program.organizationId,
+        url: new URL(page.url()).origin,
+      }])
     }
 
     const ownerReviewResponse = await page.request.post(
@@ -192,7 +200,7 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       checkpoints: [{ title: 'Acceptance checkpoint', dueDate: checkpointDate }],
     }
     const pilotResponse = await page.request.post('/api/channel_architect/pilots', { data: pilotPayload })
-    expect(pilotResponse.status()).toBe(201)
+    expect(pilotResponse.status(), await pilotResponse.text()).toBe(201)
     const pilot = await pilotResponse.json() as PilotCreated
     expect(pilot.checkpointIds).toHaveLength(1)
 
@@ -222,27 +230,32 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       await pilotViewerPage.close()
     }
 
-    const activateResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+    const pilotApi = await request.newContext({
+      baseURL: process.env.BASE_URL || 'http://localhost:3000',
+      storageState: { cookies: await page.context().cookies(), origins: [] },
+    })
+    const activateResponse = await pilotApi.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { status: 'active' },
     })
     expect(activateResponse.status()).toBe(200)
-    const prematureCompletionResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+    const prematureCompletionResponse = await pilotApi.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { status: 'completed', outcome: 'continue' },
     })
     expect(prematureCompletionResponse.status()).toBe(409)
-    const checkpointResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+    const checkpointResponse = await pilotApi.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { checkpointId: pilot.checkpointIds[0], status: 'completed' },
     })
     expect(checkpointResponse.status()).toBe(200)
-    const completeResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+    const completeResponse = await pilotApi.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { status: 'completed', outcome: 'continue' },
     })
     expect(completeResponse.status()).toBe(200)
     expect(await completeResponse.json()).toMatchObject({ status: 'completed', outcome: 'continue' })
-    const reopenedPilotResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+    const reopenedPilotResponse = await pilotApi.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { status: 'active' },
     })
     expect(reopenedPilotResponse.status()).toBe(409)
+    await pilotApi.dispose()
 
     const revisionResponse = await page.request.patch('/api/channel_architect/programs', {
       data: {

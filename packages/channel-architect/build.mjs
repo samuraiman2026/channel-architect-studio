@@ -51,6 +51,10 @@ for (const file of await collect(join(root, 'src'))) {
   if (!file.endsWith('.json') && !isSchemaDiscoveryFile) continue
   const outputPath = join(root, 'dist', relativePath)
   await mkdir(dirname(outputPath), { recursive: true })
+  if (/(^|[/\\])data[/\\]entities\.ts$/.test(relativePath)) {
+    await copyFile(outputPath.replace(/\.ts$/, '.js'), outputPath)
+    continue
+  }
   await copyFile(file, outputPath)
 }
 
