@@ -196,44 +196,46 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
     ensureOrganizationScope(ctx, raw.organizationId)
     if (!ctx.auth?.sub) throw new CrudHttpError(401, { error: 'Authenticated actor is required to update a checkpoint.' })
     const em = (ctx.container.resolve('em') as EntityManager).fork()
-    const pilot = await em.findOne(ChannelArchitectPilot, {
-      id: raw.pilotId,
-      tenantId: raw.tenantId,
-      organizationId: raw.organizationId,
-      isActive: true,
-      deletedAt: null,
-    })
-    if (!pilot) throw notFound('Pilot not found')
-    if (!canUpdatePilotCheckpoints(pilot.status)) {
-      throw new CrudHttpError(409, { error: 'Checkpoints can only be updated while a pilot is active or paused.' })
-    }
-    const checkpoint = await em.findOne(ChannelArchitectPilotCheckpoint, {
-      id: raw.checkpointId,
-      pilotId: pilot.id,
-      tenantId: raw.tenantId,
-      organizationId: raw.organizationId,
-      isActive: true,
-      deletedAt: null,
-    })
-    if (!checkpoint) throw notFound('Pilot checkpoint not found')
-    if (checkpoint.status !== 'planned') {
-      throw new CrudHttpError(409, { error: 'This checkpoint already has a final status.' })
-    }
-    const updated = await em.nativeUpdate(ChannelArchitectPilotCheckpoint, {
-      id: checkpoint.id,
-      pilotId: pilot.id,
-      tenantId: raw.tenantId,
-      organizationId: raw.organizationId,
-      status: 'planned',
-      isActive: true,
-      deletedAt: null,
-    }, {
-      status: parsed.status,
-      completedAt: parsed.status === 'completed' ? new Date() : null,
-      updatedAt: new Date(),
-    })
-    if (updated !== 1) throw new CrudHttpError(409, { error: 'Checkpoint changed. Reload the pilot before updating it.' })
-    return { checkpointId: checkpoint.id, status: parsed.status }
+    await withAtomicFlush(em, [async () => {
+      const pilot = await em.findOne(ChannelArchitectPilot, {
+        id: raw.pilotId,
+        tenantId: raw.tenantId,
+        organizationId: raw.organizationId,
+        isActive: true,
+        deletedAt: null,
+      }, { lockMode: LockMode.PESSIMISTIC_WRITE, refresh: true })
+      if (!pilot) throw notFound('Pilot not found')
+      if (!canUpdatePilotCheckpoints(pilot.status)) {
+        throw new CrudHttpError(409, { error: 'Checkpoints can only be updated while a pilot is active or paused.' })
+      }
+      const checkpoint = await em.findOne(ChannelArchitectPilotCheckpoint, {
+        id: raw.checkpointId,
+        pilotId: pilot.id,
+        tenantId: raw.tenantId,
+        organizationId: raw.organizationId,
+        isActive: true,
+        deletedAt: null,
+      }, { lockMode: LockMode.PESSIMISTIC_WRITE, refresh: true })
+      if (!checkpoint) throw notFound('Pilot checkpoint not found')
+      if (checkpoint.status !== 'planned') {
+        throw new CrudHttpError(409, { error: 'This checkpoint already has a final status.' })
+      }
+      const updated = await em.nativeUpdate(ChannelArchitectPilotCheckpoint, {
+        id: checkpoint.id,
+        pilotId: pilot.id,
+        tenantId: raw.tenantId,
+        organizationId: raw.organizationId,
+        status: 'planned',
+        isActive: true,
+        deletedAt: null,
+      }, {
+        status: parsed.status,
+        completedAt: parsed.status === 'completed' ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      if (updated !== 1) throw new CrudHttpError(409, { error: 'Checkpoint changed. Reload the pilot before updating it.' })
+    }], { transaction: true })
+    return { checkpointId: raw.checkpointId, status: parsed.status }
   },
   buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
     actionLabel: 'Update partner pilot checkpoint',

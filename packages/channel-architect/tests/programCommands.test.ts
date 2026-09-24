@@ -89,6 +89,7 @@ function pilotCommandContext(options: {
   currentVersionNumber?: number
   reviewDecision?: 'approved' | 'rejected' | null
   nextVersionAfterInitialRead?: number
+  pilotStatusAtTransactionStart?: string
   pilot?: Record<string, unknown>
   checkpoints?: Record<string, unknown>[]
 } = {}) {
@@ -151,7 +152,10 @@ function pilotCommandContext(options: {
       Object.assign(target, changes)
       return 1
     },
-    async begin() {}, async commit() {}, async rollback() {}, async flush() {},
+    async begin() {
+      if (options.pilotStatusAtTransactionStart) pilot.status = options.pilotStatusAtTransactionStart
+    },
+    async commit() {}, async rollback() {}, async flush() {},
     create(_entity: unknown, data: Record<string, unknown>) { return { ...data } },
     persist(value: unknown) {
       if (Array.isArray(value)) persisted.push(...value)
@@ -415,5 +419,17 @@ describe('Open Mercato lifecycle commands', () => {
       }).runtime),
       /only be updated while a pilot is active or paused/,
     )
+  })
+
+  it('rechecks pilot status after acquiring the checkpoint transaction lock', async () => {
+    const pilot = { id: 'pilot-1', tenantId: 'tenant-1', organizationId: 'org-1', status: 'active', isActive: true, deletedAt: null, outcome: null }
+    const checkpoint = { id: 'checkpoint-1', pilotId: 'pilot-1', status: 'planned' }
+    await assert.rejects(
+      async () => updatePilotCheckpoint.execute({
+        tenantId: 'tenant-1', organizationId: 'org-1', pilotId: 'pilot-1', checkpointId: 'checkpoint-1', input: { status: 'completed' },
+      }, pilotCommandContext({ pilot, checkpoints: [checkpoint], pilotStatusAtTransactionStart: 'cancelled' }).runtime),
+      /only be updated while a pilot is active or paused/,
+    )
+    assert.equal(checkpoint.status, 'planned')
   })
 })
