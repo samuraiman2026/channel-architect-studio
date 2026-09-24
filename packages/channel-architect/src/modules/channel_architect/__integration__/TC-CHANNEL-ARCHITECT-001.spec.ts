@@ -29,6 +29,7 @@ function dateFromNow(days: number) {
 
 test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', () => {
   test('enforces role grants and keeps pilots bound to approved current versions', async ({ page, browser }) => {
+    test.setTimeout(90_000)
     const scenario = SCENARIO_LIST[0]
     const settings = scenario.defaults
     const programName = `Channel Architect acceptance ${Date.now()}`
@@ -77,6 +78,12 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
         { data: { decision: 'rejected', rationale: 'A final decision already exists.' } },
       )
       expect(duplicateReviewResponse.status()).toBe(409)
+      const approvedDetailResponse = await reviewerPage.request.get(`/api/channel_architect/programs?id=${created.programId}`)
+      expect(approvedDetailResponse.status()).toBe(200)
+      const approvedDetail = await approvedDetailResponse.json()
+      expect(approvedDetail.program.status).toBe('active')
+      expect(approvedDetail.reviews).toHaveLength(1)
+      expect(approvedDetail.reviews[0].decision).toBe('approved')
     } finally {
       await reviewerPage.close()
     }
@@ -132,6 +139,10 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       data: { status: 'active' },
     })
     expect(activateResponse.status()).toBe(200)
+    const prematureCompletionResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+      data: { status: 'completed', outcome: 'continue' },
+    })
+    expect(prematureCompletionResponse.status()).toBe(409)
     const checkpointResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { checkpointId: pilot.checkpointIds[0], status: 'completed' },
     })
@@ -141,6 +152,10 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     })
     expect(completeResponse.status()).toBe(200)
     expect(await completeResponse.json()).toMatchObject({ status: 'completed', outcome: 'continue' })
+    const reopenedPilotResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
+      data: { status: 'active' },
+    })
+    expect(reopenedPilotResponse.status()).toBe(409)
 
     const revisionResponse = await page.request.patch('/api/channel_architect/programs', {
       data: {
@@ -161,10 +176,37 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     })
     expect(unapprovedPilotResponse.status()).toBe(409)
 
+    const rejectionPage = await browser.newPage()
+    try {
+      await login(rejectionPage, 'admin')
+      const rejectionResponse = await rejectionPage.request.post(
+        `/api/channel_architect/programs/${revision.versionId}/review`,
+        { data: { decision: 'rejected', rationale: 'Acceptance test verifies rejected versions cannot pilot.' } },
+      )
+      expect(rejectionResponse.status()).toBe(201)
+    } finally {
+      await rejectionPage.close()
+    }
+    const rejectedPilotResponse = await page.request.post('/api/channel_architect/pilots', {
+      data: { ...pilotPayload, programVersionId: revision.versionId },
+    })
+    expect(rejectedPilotResponse.status()).toBe(409)
+
     const archiveResponse = await page.request.patch('/api/channel_architect/programs', {
       data: { programId: created.programId, expectedVersion: 2, action: 'archive' },
     })
     expect(archiveResponse.status()).toBe(200)
+    const archivedDetailResponse = await page.request.get(`/api/channel_architect/programs?id=${created.programId}`)
+    expect(archivedDetailResponse.status()).toBe(200)
+    const archivedDetail = await archivedDetailResponse.json()
+    expect(archivedDetail.program.status).toBe('archived')
+    expect(archivedDetail.versions).toHaveLength(2)
+    expect(archivedDetail.reviews).toHaveLength(2)
+    const archivedPilotResponse = await page.request.post('/api/channel_architect/pilots', {
+      data: { ...pilotPayload, programVersionId: revision.versionId },
+    })
+    expect(archivedPilotResponse.status()).toBe(409)
+    expect((await archivedPilotResponse.json()).error).toContain('Archived programs cannot start new pilots')
     const archivedRevisionResponse = await page.request.patch('/api/channel_architect/programs', {
       data: {
         programId: created.programId,
