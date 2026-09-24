@@ -20,7 +20,9 @@ export function buildChannelArchitectAuditLog(input: ChannelArchitectAuditInput)
     tenantId: input.tenantId,
     organizationId: input.organizationId,
     actorUserId: input.actorUserId,
-    payload: input.payload,
+    // The command bus otherwise wraps the full raw input for redo. Lifecycle
+    // records are immutable/non-undoable, so keep only this audited safe payload.
+    payload: { __redoInput: input.payload },
     ...(input.relatedResourceKind ? { relatedResourceKind: input.relatedResourceKind } : {}),
     ...(input.relatedResourceId ? { relatedResourceId: input.relatedResourceId } : {}),
   }

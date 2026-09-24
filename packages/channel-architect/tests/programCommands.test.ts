@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { CommandBus } from '@open-mercato/shared/lib/commands'
 import { archiveProgram, createProgram, reviseProgram, reviewProgram } from '../src/modules/channel_architect/commands/programs'
 import { createPilot, updatePilotCheckpoint, updatePilotStatus } from '../src/modules/channel_architect/commands/pilots'
 import {
@@ -29,6 +30,7 @@ function commandContext(
   afterRead?: () => void,
   actorId: string | null = 'user-1',
   options: { versionNumber?: number; versionCreator?: string; reviews?: Record<string, unknown>[] } = {},
+  services: Record<string, unknown> = {},
 ) {
   const version = {
     id: 'version-1',
@@ -77,7 +79,7 @@ function commandContext(
     auth: { tenantId: 'tenant-1', sub: actorId },
     selectedOrganizationId: 'org-1',
     organizationIds: ['org-1'],
-    container: { resolve: () => em },
+    container: { resolve: (key: string) => key === 'em' ? em : services[key] },
   } as never
 }
 
@@ -293,7 +295,7 @@ describe('Open Mercato lifecycle commands', () => {
       snapshots: {},
     })
     assert.equal(reviewAudit?.resourceKind, 'channel_architect.program_version')
-    assert.deepEqual(reviewAudit?.payload, { programVersionId: 'version-1', reviewId: 'review-1', decision: 'approved' })
+    assert.deepEqual(reviewAudit?.payload, { __redoInput: { programVersionId: 'version-1', reviewId: 'review-1', decision: 'approved' } })
     assert.equal(JSON.stringify(reviewAudit).includes('Private reviewer note'), false)
 
     const pilotAudit = await createPilot.buildLog?.({
@@ -305,10 +307,29 @@ describe('Open Mercato lifecycle commands', () => {
       ctx: commandContext(programState()),
       snapshots: {},
     })
-    assert.deepEqual(pilotAudit?.payload, {
+    assert.deepEqual(pilotAudit?.payload, { __redoInput: {
       pilotId: 'pilot-1', programVersionId: 'version-1', checkpointIds: ['checkpoint-1'],
-    })
+    } })
     assert.equal(JSON.stringify(pilotAudit).includes('Cohort'), false)
+  })
+
+  it('persists only the safe audit payload through the Open Mercato command bus', async () => {
+    const state = programState()
+    const auditEntries: Record<string, unknown>[] = []
+    const ctx = commandContext(state, undefined, 'user-1', {}, {
+      actionLogService: { log: async (entry: Record<string, unknown>) => { auditEntries.push(entry); return { ...entry, id: 'audit-1' } } },
+    })
+    const { result, logEntry } = await new CommandBus().execute(
+      'channel_architect.programs.archive',
+      { input: { programId: 'program-1', tenantId: 'tenant-1', organizationId: 'org-1', expectedVersion: 3 }, ctx },
+    )
+
+    assert.deepEqual(result, { programId: 'program-1', status: 'archived' })
+    assert.equal(logEntry?.resourceKind, 'channel_architect.program')
+    assert.equal(auditEntries.length, 1)
+    const commandPayload = auditEntries[0].commandPayload as { __redoInput: Record<string, unknown> }
+    assert.deepEqual(commandPayload.__redoInput, { programId: 'program-1', status: 'archived' })
+    assert.equal('expectedVersion' in commandPayload.__redoInput, false)
   })
 
   it('creates a pilot only from the approved current version and persists its checkpoints', async () => {
