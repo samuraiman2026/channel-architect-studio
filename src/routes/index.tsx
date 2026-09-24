@@ -12,6 +12,7 @@ import { ScenarioCard } from "@/components/ScenarioCard";
 import { AxisControls } from "@/components/AxisControls";
 import { OutputSection } from "@/components/OutputSection";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
+import { normalizeLocalDraftReview } from "@/lib/localDraftReview";
 
 export const Route = createFileRoute("/")({
   component: ChannelArchitect,
@@ -36,7 +37,9 @@ interface SavedDraft {
   engineVersion: string;
   savedAt: string;
   owner: string;
-  status: "draft" | "approved";
+  status: "draft";
+  localEndorsement?: { name: string; at: string };
+  /** Older browser saves called this an approval. It is migrated to a local endorsement on read. */
   approval?: { name: string; at: string };
   scenario: Scenario;
   settings: AxisSettings;
@@ -83,15 +86,23 @@ function ChannelArchitect() {
               typeof item.settings?.stage === "string" &&
               typeof item.sections?.["exec-summary"] === "string",
           )
-          .map((item) => ({
-            ...item,
-            programId: typeof item.programId === "string" ? item.programId : item.id,
-            version: typeof item.version === "number" ? item.version : 1,
-            engineVersion:
-              typeof item.engineVersion === "string" ? item.engineVersion : "legacy-unversioned",
-            owner: typeof item.owner === "string" ? item.owner : "Local browser user",
-            status: item.status === "approved" ? ("approved" as const) : ("draft" as const),
-          }));
+          .map((item) => {
+            const {
+              approval: legacyApproval,
+              status: _legacyStatus,
+              localEndorsement: savedEndorsement,
+              ...saved
+            } = item;
+            return {
+              ...saved,
+              ...normalizeLocalDraftReview(savedEndorsement, legacyApproval),
+              programId: typeof item.programId === "string" ? item.programId : item.id,
+              version: typeof item.version === "number" ? item.version : 1,
+              engineVersion:
+                typeof item.engineVersion === "string" ? item.engineVersion : "legacy-unversioned",
+              owner: typeof item.owner === "string" ? item.owner : "Local browser user",
+            };
+          });
         setDrafts(normalized);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       }
@@ -162,23 +173,23 @@ function ChannelArchitect() {
     setPhase("output");
   };
 
-  const approveDraft = (name: string) => {
+  const recordLocalEndorsement = (name: string) => {
     const active = drafts.find((item) => item.id === activeDraftId);
-    if (!active || active.status === "approved" || !name.trim()) return;
+    if (!active || !name.trim()) return;
     const updated = {
       ...active,
-      status: "approved" as const,
-      approval: { name: name.trim(), at: new Date().toISOString() },
+      status: "draft" as const,
+      localEndorsement: { name: name.trim(), at: new Date().toISOString() },
     };
     const next = drafts.map((item) => (item.id === active.id ? updated : item));
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       setDrafts(next);
       setNotice(
-        `Version ${updated.version} marked approved on this device. This is a prototype record, not an authenticated approval.`,
+        `Local endorsement noted for version ${updated.version}. This browser-only record does not approve or authorize the program.`,
       );
     } catch {
-      setNotice("This device could not save the approval record.");
+      setNotice("This device could not save the local endorsement note.");
     }
   };
 
@@ -249,7 +260,7 @@ function ChannelArchitect() {
             settings={settings}
             sections={sections}
             draft={drafts.find((item) => item.id === activeDraftId)}
-            onApprove={approveDraft}
+            onRecordLocalEndorsement={recordLocalEndorsement}
             onRegenerate={() => setPhase("configure")}
             onStartOver={() => {
               setPhase("select");
@@ -361,8 +372,8 @@ function ScenarioSelector({
                     onClick={() => onOpenDraft(draft)}
                     className="text-left underline underline-offset-4 text-primary"
                   >
-                    {draft.scenario.label} · v{draft.version} · {draft.status} · {draft.owner} ·{" "}
-                    {new Date(draft.savedAt).toLocaleString()}
+                    {draft.scenario.label} · v{draft.version} · Local draft, unapproved ·{" "}
+                    {draft.owner} · {new Date(draft.savedAt).toLocaleString()}
                   </button>
                 </li>
               ))}
@@ -379,7 +390,7 @@ function OutputView({
   settings,
   sections,
   draft,
-  onApprove,
+  onRecordLocalEndorsement,
   onRegenerate,
   onStartOver,
 }: {
@@ -387,7 +398,7 @@ function OutputView({
   settings: AxisSettings;
   sections: Sections;
   draft?: SavedDraft;
-  onApprove: (name: string) => void;
+  onRecordLocalEndorsement: (name: string) => void;
   onRegenerate: () => void;
   onStartOver: () => void;
 }) {
@@ -413,39 +424,38 @@ function OutputView({
                   Design rules: <strong>{draft.engineVersion}</strong>
                 </span>
                 <span>
-                  Status: <strong>{draft.status}</strong>
+                  Status: <strong>Local draft, unapproved</strong>
                 </span>
               </div>
-              {draft.approval && (
+              {draft.localEndorsement && (
                 <p className="mt-2 text-muted-foreground">
-                  Recorded by {draft.approval.name} · {new Date(draft.approval.at).toLocaleString()}
+                  Local endorsement noted by {draft.localEndorsement.name} ·{" "}
+                  {new Date(draft.localEndorsement.at).toLocaleString()}
                 </p>
               )}
-              {draft.status !== "approved" && (
-                <div className="mt-3 border-t border-border pt-3">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Prototype only: this browser record does not verify identity or permission.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      aria-label="Reviewer name"
-                      className="min-w-0 flex-1 border border-border bg-background px-3 py-2"
-                      value={reviewer}
-                      maxLength={120}
-                      onChange={(event) => setReviewer(event.target.value)}
-                      placeholder="Reviewer name"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onApprove(reviewer)}
-                      disabled={!reviewer.trim()}
-                      className="bg-primary text-primary-foreground px-4 py-2 disabled:opacity-40"
-                    >
-                      Record local approval
-                    </button>
-                  </div>
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Local note only: this does not verify identity, permission, or program approval.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    aria-label="Endorser name"
+                    className="min-w-0 flex-1 border border-border bg-background px-3 py-2"
+                    value={reviewer}
+                    maxLength={120}
+                    onChange={(event) => setReviewer(event.target.value)}
+                    placeholder="Endorser name"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRecordLocalEndorsement(reviewer)}
+                    disabled={!reviewer.trim()}
+                    className="bg-primary text-primary-foreground px-4 py-2 disabled:opacity-40"
+                  >
+                    Record local endorsement
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
