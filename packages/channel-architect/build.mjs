@@ -25,6 +25,7 @@ await esbuild.build({
   platform: 'node',
   target: 'node20',
   jsx: 'automatic',
+  tsconfigRaw: { compilerOptions: { experimentalDecorators: true } },
   packages: 'external',
   sourcemap: true,
   logLevel: 'info',
