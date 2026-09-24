@@ -54,7 +54,8 @@ export async function GET(req: Request) {
   try {
     const { container, tenantId, organizationId } = await getContext(req)
     const em = container.resolve('em') as EntityManager
-    const rawId = new URL(req.url).searchParams.get('id')
+    const params = new URL(req.url).searchParams
+    const rawId = params.get('id')
     const id = rawId ? z.string().uuid().parse(rawId) : null
     if (id) {
       const program = await em.findOne(ChannelArchitectProgram, { id, tenantId, organizationId, isActive: true, deletedAt: null })
@@ -66,8 +67,16 @@ export async function GET(req: Request) {
         : []
       return NextResponse.json({ program, versions, reviews })
     }
-    const items = await em.find(ChannelArchitectProgram, { tenantId, organizationId, isActive: true, deletedAt: null }, { orderBy: { updatedAt: 'DESC' }, limit: 100 })
-    return NextResponse.json({ items, total: items.length })
+    const rawPage = Number(params.get('page') ?? 1)
+    const rawPageSize = Number(params.get('pageSize') ?? 25)
+    const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
+    const pageSize = Number.isFinite(rawPageSize) ? Math.min(100, Math.max(1, Math.floor(rawPageSize))) : 25
+    const where = { tenantId, organizationId, isActive: true, deletedAt: null }
+    const [items, total] = await Promise.all([
+      em.find(ChannelArchitectProgram, where, { orderBy: { updatedAt: 'DESC' }, limit: pageSize, offset: (page - 1) * pageSize }),
+      em.count(ChannelArchitectProgram, where),
+    ])
+    return NextResponse.json({ items, total, page, pageSize })
   } catch (error) {
     return errorResponse(error, 'GET')
   }
@@ -167,8 +176,8 @@ export const openApi: OpenApiRouteDoc = {
   methods: {
     GET: {
       summary: 'List or inspect programs',
-      query: z.object({ id: z.string().uuid().optional() }),
-      responses: [{ status: 200, description: 'Programs or a program with version history', schema: z.object({ items: z.array(z.unknown()).optional(), total: z.number().optional(), program: z.unknown().optional(), versions: z.array(z.unknown()).optional(), reviews: z.array(z.unknown()).optional() }) }],
+      query: z.object({ id: z.string().uuid().optional(), page: z.coerce.number().int().positive().optional(), pageSize: z.coerce.number().int().min(1).max(100).optional() }),
+      responses: [{ status: 200, description: 'Programs or a program with version history', schema: z.object({ items: z.array(z.unknown()).optional(), total: z.number().optional(), page: z.number().optional(), pageSize: z.number().optional(), program: z.unknown().optional(), versions: z.array(z.unknown()).optional(), reviews: z.array(z.unknown()).optional() }) }],
       errors: [{ status: 401, description: 'Unauthorized', schema: errorSchema }],
     },
     POST: {

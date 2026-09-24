@@ -59,6 +59,12 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     expect(initialDetail.program.organizationId).not.toBe(createPayload.organizationId)
     expect(initialDetail.versions).toHaveLength(1)
     expect(initialDetail.versions[0].scenarioSnapshot).toEqual(scenario)
+    const programListResponse = await page.request.get('/api/channel_architect/programs?page=1&pageSize=25')
+    expect(programListResponse.status()).toBe(200)
+    const programList = await programListResponse.json()
+    expect(programList).toMatchObject({ page: 1, pageSize: 25 })
+    expect(programList.total).toBeGreaterThanOrEqual(1)
+    expect(programList.items.some((item: { id: string }) => item.id === created.programId)).toBe(true)
 
     const organizationResponse = await page.request.post('/api/directory/organizations', {
       data: { name: `${programName} separate organization` },

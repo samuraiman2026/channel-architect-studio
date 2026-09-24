@@ -52,6 +52,7 @@ type Pilot = {
 
 const API = '/api/channel_architect/programs'
 const PILOT_API = '/api/channel_architect/pilots'
+const PROGRAM_PAGE_SIZE = 25
 const PILOT_PAGE_SIZE = 25
 const initialPreset = SCENARIO_LIST[0]
 const ARCHETYPES: Archetype[] = ['SI / Consulting', 'ISV', 'VAR', 'MSP', 'Referral / Agency', 'Marketplace']
@@ -71,6 +72,8 @@ function messageFrom(result: unknown, fallback: string) {
 
 export default function ChannelArchitectProgramsPage() {
   const [programs, setPrograms] = React.useState<Program[]>([])
+  const [programPage, setProgramPage] = React.useState(1)
+  const [programTotalCount, setProgramTotalCount] = React.useState(0)
   const [detail, setDetail] = React.useState<ProgramDetail | null>(null)
   const [selectedVersionId, setSelectedVersionId] = React.useState('')
   const [mode, setMode] = React.useState<'create' | 'revise' | null>(null)
@@ -102,6 +105,9 @@ export default function ChannelArchitectProgramsPage() {
   const canStartPilot = Boolean(selectedVersion && selectedReview?.decision === 'approved' && selectedVersion.versionNumber === detail?.program.currentVersionNumber)
   const economicTotal = Object.values(settings.economics).reduce((total, value) => total + value, 0)
   const canSaveDesign = economicTotal === 100 && settings.primaryArchetypes.length > 0
+  const programPageCount = Math.max(1, Math.ceil(programTotalCount / PROGRAM_PAGE_SIZE))
+  const firstProgramNumber = programTotalCount === 0 ? 0 : (programPage - 1) * PROGRAM_PAGE_SIZE + 1
+  const lastProgramNumber = Math.min(programPage * PROGRAM_PAGE_SIZE, programTotalCount)
   const pilotPageCount = Math.max(1, Math.ceil(pilotTotalCount / PILOT_PAGE_SIZE))
   const firstPilotNumber = pilotTotalCount === 0 ? 0 : (pilotPage - 1) * PILOT_PAGE_SIZE + 1
   const lastPilotNumber = Math.min(pilotPage * PILOT_PAGE_SIZE, pilotTotalCount)
@@ -121,17 +127,19 @@ export default function ChannelArchitectProgramsPage() {
     setSettings((current) => ({ ...current, economics: { ...current.economics, [key]: amount } }))
   }
 
-  const refreshPrograms = React.useCallback(async () => {
+  const refreshPrograms = React.useCallback(async (page = programPage) => {
     setLoading(true)
-    const response = await apiCall(API, undefined, {})
+    const response = await apiCall(`${API}?page=${page}&pageSize=${PROGRAM_PAGE_SIZE}`, undefined, {})
     if (!response.ok || !response.result) {
       setNotice(messageFrom(response.result, 'Unable to load partner programs.'))
       setLoading(false)
       return
     }
-    setPrograms(((response.result as { items?: Program[] }).items ?? []))
+    const result = response.result as { items?: Program[]; total?: number }
+    setPrograms(result.items ?? [])
+    setProgramTotalCount(result.total ?? 0)
     setLoading(false)
-  }, [])
+  }, [programPage])
 
   React.useEffect(() => { void refreshPrograms() }, [refreshPrograms])
 
@@ -211,11 +219,25 @@ export default function ChannelArchitectProgramsPage() {
       setSaving(false)
       return
     }
-    setNotice(mode === 'create' ? 'Program and version 1 created.' : 'A new immutable version was added.')
+    const creating = mode === 'create'
+    const saved = response.result as { programId?: string; version?: number }
+    const targetProgramId = creating ? saved.programId : editingProgramId
+    const targetProgramName = creating ? programName.trim() : detail?.program.name ?? programName.trim()
+    setNotice(creating ? 'Program and version 1 created.' : 'A new immutable version was added.')
     setMode(null)
     setSaving(false)
-    await refreshPrograms()
-    if (mode === 'revise' && detail) await openProgram(detail.program)
+    if (programPage === 1) await refreshPrograms(1)
+    else setProgramPage(1)
+    if (targetProgramId) {
+      await openProgram({
+        id: targetProgramId,
+        name: targetProgramName,
+        ownerUserId: detail?.program.ownerUserId ?? '',
+        status: detail?.program.status ?? 'draft',
+        currentVersionNumber: saved.version ?? detail?.program.currentVersionNumber ?? 1,
+        updatedAt: new Date().toISOString(),
+      })
+    }
   }
 
   async function archiveProgram(program: Program) {
@@ -391,7 +413,7 @@ export default function ChannelArchitectProgramsPage() {
 
           <div className="grid gap-6 lg:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.6fr)]">
             <section className="rounded-lg border bg-card p-4">
-              <h2 className="mb-3 font-medium">Programs</h2>
+              <div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-medium">Programs</h2><span className="text-xs text-muted-foreground">{programTotalCount} total</span></div>
               {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : programs.length === 0 ? <p className="text-sm text-muted-foreground">No programs yet. Create one to start a shared, versioned design.</p> : (
                 <ul className="space-y-2">
                   {programs.map((program) => <li key={program.id}>
@@ -402,6 +424,14 @@ export default function ChannelArchitectProgramsPage() {
                   </li>)}
                 </ul>
               )}
+              <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3 text-xs">
+                <span className="text-muted-foreground">Showing {firstProgramNumber}–{lastProgramNumber}</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Previous programs page" disabled={programPage <= 1} onClick={() => setProgramPage((page) => Math.max(1, page - 1))}>Previous</button>
+                  <span aria-live="polite">{programPage}/{programPageCount}</span>
+                  <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Next programs page" disabled={programPage >= programPageCount} onClick={() => setProgramPage((page) => Math.min(programPageCount, page + 1))}>Next</button>
+                </div>
+              </div>
             </section>
 
             <section className="min-w-0 rounded-lg border bg-card p-4">
