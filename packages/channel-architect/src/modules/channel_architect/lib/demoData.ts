@@ -127,10 +127,40 @@ export const DEMO_PROGRAMS: DemoProgram[] = [
 
 /** Produce valid future pilot dates without baking stale dates into the fixture pack. */
 export function buildDemoPilotDates(program: DemoProgram, startDate = new Date()) {
-  const start = new Date(
-    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()),
-  );
-  const toDateOnly = (date: Date) => date.toISOString().slice(0, 10);
+  if (!Number.isFinite(startDate.getTime())) {
+    throw new RangeError("Demo pilot start date must be a valid date.");
+  }
+
+  const durationDays = program.pilot.durationDays;
+  const checkpoints = program.pilot.checkpoints;
+  if (!Number.isInteger(durationDays) || durationDays < 1) {
+    throw new RangeError("Demo pilot duration must be a positive whole number of days.");
+  }
+  if (checkpoints.length < 1 || checkpoints.length > 30) {
+    throw new RangeError("Demo pilot schedules must contain between 1 and 30 checkpoints.");
+  }
+  if (
+    checkpoints.some(
+      ({ title, dayOffset }) =>
+        typeof title !== "string" ||
+        !title.trim() ||
+        !Number.isInteger(dayOffset) ||
+        dayOffset < 0 ||
+        dayOffset > durationDays,
+    )
+  ) {
+    throw new RangeError("Demo checkpoint offsets must be whole days within the pilot window.");
+  }
+
+  const start = new Date(startDate);
+  start.setUTCHours(0, 0, 0, 0);
+  const toDateOnly = (date: Date) => {
+    const year = date.getUTCFullYear();
+    if (!Number.isFinite(date.getTime()) || year < 0 || year > 9999) {
+      throw new RangeError("Demo pilot dates must fit the YYYY-MM-DD format.");
+    }
+    return `${String(year).padStart(4, "0")}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  };
   const addDays = (days: number) => {
     const date = new Date(start);
     date.setUTCDate(date.getUTCDate() + days);
@@ -139,8 +169,8 @@ export function buildDemoPilotDates(program: DemoProgram, startDate = new Date()
 
   return {
     targetStartDate: toDateOnly(start),
-    targetEndDate: addDays(program.pilot.durationDays),
-    checkpoints: program.pilot.checkpoints.map(({ title, dayOffset }) => ({
+    targetEndDate: addDays(durationDays),
+    checkpoints: checkpoints.map(({ title, dayOffset }) => ({
       title,
       dueDate: addDays(dayOffset),
     })),
