@@ -32,4 +32,6 @@ Program and pilot lists are tenant- and organization-scoped, paginated, searchab
 
 Generated partner-program content is a planning hypothesis. It is not a benchmark, forecast, commercial offer, commission schedule, or source of attribution truth.
 
+Fictional example programs and a role-aware walkthrough are in [`demo/README.md`](demo/README.md). The demo pack is opt-in and does not write records to a database; create its examples through the backend UI to preserve the module's normal authorization and review workflow.
+
 See [SPEC-001](../../.ai/specs/SPEC-001-channel-architect-open-mercato.md) and the repository's [Open Mercato integration notes](../../docs/open-mercato-integration.md) for the intended data and security boundaries.
