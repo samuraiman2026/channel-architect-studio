@@ -74,6 +74,9 @@ export default function ChannelArchitectProgramsPage() {
   const [programs, setPrograms] = React.useState<Program[]>([])
   const [programPage, setProgramPage] = React.useState(1)
   const [programTotalCount, setProgramTotalCount] = React.useState(0)
+  const [programSearchInput, setProgramSearchInput] = React.useState('')
+  const [programSearch, setProgramSearch] = React.useState('')
+  const [programStatus, setProgramStatus] = React.useState<'all' | Program['status']>('all')
   const [detail, setDetail] = React.useState<ProgramDetail | null>(null)
   const [selectedVersionId, setSelectedVersionId] = React.useState('')
   const [mode, setMode] = React.useState<'create' | 'revise' | null>(null)
@@ -88,6 +91,9 @@ export default function ChannelArchitectProgramsPage() {
   const [settings, setSettings] = React.useState<AxisSettings>(initialPreset.defaults)
   const [rationale, setRationale] = React.useState('')
   const [notice, setNotice] = React.useState('')
+  const [grantedFeatures, setGrantedFeatures] = React.useState<Set<string>>(new Set())
+  const [currentUserId, setCurrentUserId] = React.useState('')
+  const [permissionsReady, setPermissionsReady] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
   const [pilots, setPilots] = React.useState<Pilot[]>([])
@@ -102,6 +108,16 @@ export default function ChannelArchitectProgramsPage() {
 
   const selectedVersion = detail?.versions.find((version) => version.id === selectedVersionId) ?? detail?.versions[0]
   const selectedReview = detail?.reviews.find((review) => review.programVersionId === selectedVersion?.id)
+  const canManagePrograms = grantedFeatures.has('channel_architect.programs.manage')
+  const canReviewPrograms = grantedFeatures.has('channel_architect.programs.approve')
+  const canManagePilots = grantedFeatures.has('channel_architect.pilots.manage')
+  const isReviewAuthor = Boolean(
+    currentUserId && selectedVersion && detail
+    && (currentUserId === detail.program.ownerUserId || currentUserId === selectedVersion.createdBy),
+  )
+  const canReviewSelectedVersion = Boolean(
+    canReviewPrograms && currentUserId && selectedVersion && detail && !isReviewAuthor,
+  )
   const canStartPilot = Boolean(selectedVersion && selectedReview?.decision === 'approved' && selectedVersion.versionNumber === detail?.program.currentVersionNumber)
   const economicTotal = Object.values(settings.economics).reduce((total, value) => total + value, 0)
   const canSaveDesign = economicTotal === 100 && settings.primaryArchetypes.length > 0
@@ -129,7 +145,10 @@ export default function ChannelArchitectProgramsPage() {
 
   const refreshPrograms = React.useCallback(async (page = programPage) => {
     setLoading(true)
-    const response = await apiCall(`${API}?page=${page}&pageSize=${PROGRAM_PAGE_SIZE}`, undefined, {})
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PROGRAM_PAGE_SIZE) })
+    if (programSearch) params.set('search', programSearch)
+    if (programStatus !== 'all') params.set('status', programStatus)
+    const response = await apiCall(`${API}?${params.toString()}`, undefined, {})
     if (!response.ok || !response.result) {
       setNotice(messageFrom(response.result, 'Unable to load partner programs.'))
       setLoading(false)
@@ -139,9 +158,46 @@ export default function ChannelArchitectProgramsPage() {
     setPrograms(result.items ?? [])
     setProgramTotalCount(result.total ?? 0)
     setLoading(false)
-  }, [programPage])
+  }, [programPage, programSearch, programStatus])
 
   React.useEffect(() => { void refreshPrograms() }, [refreshPrograms])
+
+  React.useEffect(() => {
+    let cancelled = false
+    async function loadPermissions() {
+      try {
+        const response = await apiCall<{ granted?: string[]; userId?: string }>('/api/auth/feature-check', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ features: [
+            'channel_architect.programs.manage',
+            'channel_architect.programs.approve',
+            'channel_architect.pilots.manage',
+          ] }),
+        }, {})
+        if (cancelled) return
+        setGrantedFeatures(new Set(Array.isArray(response.result?.granted) ? response.result.granted : []))
+        setCurrentUserId(typeof response.result?.userId === 'string' ? response.result.userId : '')
+      } catch {
+        if (!cancelled) {
+          setGrantedFeatures(new Set())
+          setCurrentUserId('')
+        }
+      } finally {
+        if (!cancelled) setPermissionsReady(true)
+      }
+    }
+    void loadPermissions()
+    return () => { cancelled = true }
+  }, [])
+
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setProgramSearch(programSearchInput.trim())
+      setProgramPage(1)
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [programSearchInput])
 
   const refreshPilots = React.useCallback(async (page = pilotPage) => {
     const response = await apiCall(`${PILOT_API}?page=${page}&pageSize=${PILOT_PAGE_SIZE}`, undefined, {})
@@ -342,7 +398,7 @@ export default function ChannelArchitectProgramsPage() {
                 Draft, revise, and review partner-program designs. Generated guidance is a planning hypothesis, not a benchmark or commercial offer.
               </p>
             </div>
-            {!mode && <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground" onClick={beginCreate}>New program</button>}
+            {!mode && canManagePrograms && <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground" onClick={beginCreate}>New program</button>}
           </header>
 
           {notice && <p role="status" className="rounded-md border px-4 py-3 text-sm">{notice}</p>}
@@ -414,7 +470,16 @@ export default function ChannelArchitectProgramsPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.6fr)]">
             <section className="rounded-lg border bg-card p-4">
               <div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-medium">Programs</h2><span className="text-xs text-muted-foreground">{programTotalCount} total</span></div>
-              {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : programs.length === 0 ? <p className="text-sm text-muted-foreground">No programs yet. Create one to start a shared, versioned design.</p> : (
+              <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input aria-label="Search programs" placeholder="Search program names" className="min-w-0 rounded border bg-background px-3 py-2 text-sm" value={programSearchInput} onChange={(event) => setProgramSearchInput(event.target.value)} maxLength={120} />
+                <select aria-label="Filter programs by status" className="rounded border bg-background px-3 py-2 text-sm" value={programStatus} onChange={(event) => { setProgramStatus(event.target.value as typeof programStatus); setProgramPage(1) }}>
+                  <option value="all">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : programs.length === 0 ? <p className="text-sm text-muted-foreground">{programSearch || programStatus !== 'all' ? 'No programs match these filters.' : 'No programs yet. Create one to start a shared, versioned design.'}</p> : (
                 <ul className="space-y-2">
                   {programs.map((program) => <li key={program.id}>
                     <button className={`w-full rounded border px-3 py-2 text-left ${detail?.program.id === program.id ? 'border-primary bg-muted' : ''}`} onClick={() => void openProgram(program)}>
@@ -439,10 +504,10 @@ export default function ChannelArchitectProgramsPage() {
                 <div className="space-y-5">
                   <header className="flex flex-wrap items-start justify-between gap-3">
                     <div><h2 className="text-xl font-semibold">{detail.program.name}</h2><p className="text-xs text-muted-foreground">Owner user ID: {detail.program.ownerUserId}</p></div>
-                    {detail.program.status !== 'archived' ? <div className="flex gap-2">
+                    {detail.program.status !== 'archived' && canManagePrograms ? <div className="flex gap-2">
                       <button className="rounded-md border px-3 py-2 text-sm" onClick={beginRevision}>Create revision</button>
                       <button className="rounded-md border px-3 py-2 text-sm" onClick={() => void archiveProgram(detail.program)}>Archive program</button>
-                    </div> : <span className="rounded border px-3 py-2 text-sm text-muted-foreground">Archived</span>}
+                    </div> : detail.program.status === 'archived' ? <span className="rounded border px-3 py-2 text-sm text-muted-foreground">Archived</span> : null}
                   </header>
                   <div className="flex flex-wrap gap-2">
                     {detail.versions.map((version) => {
@@ -462,7 +527,7 @@ export default function ChannelArchitectProgramsPage() {
                     <p className="mt-1">Stage: {selectedVersion.settingsSnapshot.stage}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Saved {new Date(selectedVersion.createdAt).toLocaleString()} · creator {selectedVersion.createdBy}</p>
                   </div>
-                  {selectedReview ? <div className="rounded-md border p-3 text-sm"><p className="font-medium">{selectedReview.decision} by {selectedReview.reviewerUserId}</p><p className="mt-1">{selectedReview.rationale}</p></div> : (
+                  {selectedReview ? <div className="rounded-md border p-3 text-sm"><p className="font-medium">{selectedReview.decision} by {selectedReview.reviewerUserId}</p><p className="mt-1">{selectedReview.rationale}</p></div> : canReviewSelectedVersion ? (
                     <div className="space-y-3 rounded-md border p-3">
                       <label className="block text-sm">Review rationale
                         <textarea className="mt-1 min-h-24 w-full rounded border bg-background px-3 py-2" value={rationale} onChange={(event) => setRationale(event.target.value)} maxLength={8000} />
@@ -473,8 +538,8 @@ export default function ChannelArchitectProgramsPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">The API requires reviewer permission. A decision applies only to this version.</p>
                     </div>
-                  )}
-                  {canStartPilot && (
+                  ) : <p className="rounded-md border p-3 text-sm text-muted-foreground">{isReviewAuthor ? 'The program owner and version creator cannot review this version.' : 'This version has no review decision. Reviewer access is required to record one.'}</p>}
+                  {canStartPilot && canManagePilots && (
                     <section className="space-y-3 rounded-md border p-4">
                       <div><h3 className="font-medium">Start a pilot from this approved version</h3><p className="mt-1 text-xs text-muted-foreground">The pilot keeps this exact version as its governing program. Do not enter individual partner or customer details in the cohort label.</p></div>
                       <div className="grid gap-3 md:grid-cols-2">
@@ -494,6 +559,7 @@ export default function ChannelArchitectProgramsPage() {
                       <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50" disabled={savingPilot || !pilotName.trim() || !cohortLabel.trim() || !pilotStartDate || checkpointDrafts.length === 0 || checkpointDrafts.some((checkpoint) => !checkpoint.title.trim() || !checkpoint.dueDate)} onClick={() => void createPilot()}>{savingPilot ? 'Saving…' : 'Create pilot'}</button>
                     </section>
                   )}
+                  {canStartPilot && permissionsReady && !canManagePilots && <p className="rounded-md border p-3 text-sm text-muted-foreground">This version is approved and current. Pilot-management access is required to start a pilot.</p>}
                   <details>
                     <summary className="cursor-pointer text-sm font-medium">Generated design sections</summary>
                     <div className="mt-3 space-y-4">
@@ -510,7 +576,7 @@ export default function ChannelArchitectProgramsPage() {
 
           <section className="space-y-3 rounded-lg border bg-card p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div><h2 className="font-medium">Pilots</h2><p className="mt-1 text-sm text-muted-foreground">Each pilot is tied to an approved program version. Completion requires a continue, revise, or stop decision.</p></div>
+              <div><h2 className="font-medium">Pilots</h2><p className="mt-1 text-sm text-muted-foreground">Each pilot is tied to an approved program version. Completion requires a continue, revise, or stop decision.</p>{permissionsReady && !canManagePilots && <p className="mt-1 text-xs text-muted-foreground">View only. Pilot-management access is required to create pilots, update statuses, or resolve checkpoints.</p>}</div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-muted-foreground">Showing {firstPilotNumber}–{lastPilotNumber} of {pilotTotalCount}</span>
                 <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Previous pilots page" disabled={pilotPage <= 1} onClick={() => setPilotPage((page) => Math.max(1, page - 1))}>Previous</button>
@@ -524,16 +590,18 @@ export default function ChannelArchitectProgramsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div><h3 className="font-medium">{pilot.name}</h3><p className="text-sm text-muted-foreground">{pilot.cohortLabel} · owner {pilot.ownerUserId} · {pilot.targetStartDate.slice(0, 10)}{pilot.targetEndDate ? ` to ${pilot.targetEndDate.slice(0, 10)}` : ''}</p><p className="mt-1 text-xs text-muted-foreground">{pilot.programName} · version {pilot.programVersionNumber ?? 'unavailable'} · {pilot.status}{pilot.outcome ? ` · outcome: ${pilot.outcome}` : ''}</p></div>
                     <div className="flex flex-wrap gap-2">
+                      {canManagePilots && <>
                       {pilot.status === 'planned' && <><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'active')}>Start</button><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'cancelled')}>Cancel</button></>}
                       {pilot.status === 'active' && <><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'paused')}>Pause</button><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'cancelled')}>Cancel</button>{(['continue', 'revise', 'stop'] as const).map((outcome) => <button key={outcome} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50" disabled={pilot.checkpoints.some((checkpoint) => checkpoint.status === 'planned')} onClick={() => void updatePilot(pilot, 'completed', outcome)}>Complete: {outcome}</button>)}</>}
                       {pilot.status === 'paused' && <><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'active')}>Resume</button><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'cancelled')}>Cancel</button></>}
+                      </>}
                     </div>
                   </div>
                   {pilot.status === 'active' && pilot.checkpoints.some((checkpoint) => checkpoint.status === 'planned') && <p className="mt-2 text-xs text-muted-foreground">Complete or skip all checkpoints before recording an outcome.</p>}
                   <ul className="mt-3 space-y-2">
                     {pilot.checkpoints.map((checkpoint) => <li key={checkpoint.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span>{checkpoint.title} · due {checkpoint.dueDate.slice(0, 10)} · {checkpoint.status}</span>
-                      {checkpoint.status === 'planned' && (pilot.status === 'active' || pilot.status === 'paused') && <span className="flex gap-2"><button className="rounded border px-2 py-1 text-xs" onClick={() => void updateCheckpoint(pilot, checkpoint, 'completed')}>Complete</button><button className="rounded border px-2 py-1 text-xs" onClick={() => void updateCheckpoint(pilot, checkpoint, 'skipped')}>Skip</button></span>}
+                      {canManagePilots && checkpoint.status === 'planned' && (pilot.status === 'active' || pilot.status === 'paused') && <span className="flex gap-2"><button className="rounded border px-2 py-1 text-xs" onClick={() => void updateCheckpoint(pilot, checkpoint, 'completed')}>Complete</button><button className="rounded border px-2 py-1 text-xs" onClick={() => void updateCheckpoint(pilot, checkpoint, 'skipped')}>Skip</button></span>}
                     </li>)}
                   </ul>
                 </li>)}

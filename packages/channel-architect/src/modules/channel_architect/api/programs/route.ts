@@ -8,6 +8,7 @@ import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
 import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/directory/utils/organizationScope'
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
+import { escapeLikePattern } from '@open-mercato/shared/lib/db/escapeLikePattern'
 import { ChannelArchitectProgram, ChannelArchitectProgramReview, ChannelArchitectProgramVersion } from '../../data/entities'
 import { programArchiveSchema, programCreateSchema, programRevisionSchema } from '../../data/validators'
 
@@ -71,7 +72,17 @@ export async function GET(req: Request) {
     const rawPageSize = Number(params.get('pageSize') ?? 25)
     const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
     const pageSize = Number.isFinite(rawPageSize) ? Math.min(100, Math.max(1, Math.floor(rawPageSize))) : 25
-    const where = { tenantId, organizationId, isActive: true, deletedAt: null }
+    const search = z.string().trim().max(120).optional().parse(params.get('search') || undefined)
+    const status = z.enum(['draft', 'active', 'archived']).optional().parse(params.get('status') || undefined)
+    const escapedSearch = search ? escapeLikePattern(search) : undefined
+    const where = {
+      tenantId,
+      organizationId,
+      isActive: true,
+      deletedAt: null,
+      ...(status ? { status } : {}),
+      ...(escapedSearch ? { name: { $ilike: `%${escapedSearch}%` } } : {}),
+    }
     const [items, total] = await Promise.all([
       em.find(ChannelArchitectProgram, where, { orderBy: { updatedAt: 'DESC' }, limit: pageSize, offset: (page - 1) * pageSize }),
       em.count(ChannelArchitectProgram, where),
@@ -176,7 +187,7 @@ export const openApi: OpenApiRouteDoc = {
   methods: {
     GET: {
       summary: 'List or inspect programs',
-      query: z.object({ id: z.string().uuid().optional(), page: z.coerce.number().int().positive().optional(), pageSize: z.coerce.number().int().min(1).max(100).optional() }),
+      query: z.object({ id: z.string().uuid().optional(), page: z.coerce.number().int().positive().optional(), pageSize: z.coerce.number().int().min(1).max(100).optional(), search: z.string().trim().max(120).optional(), status: z.enum(['draft', 'active', 'archived']).optional() }),
       responses: [{ status: 200, description: 'Programs or a program with version history', schema: z.object({ items: z.array(z.unknown()).optional(), total: z.number().optional(), page: z.number().optional(), pageSize: z.number().optional(), program: z.unknown().optional(), versions: z.array(z.unknown()).optional(), reviews: z.array(z.unknown()).optional() }) }],
       errors: [{ status: 401, description: 'Unauthorized', schema: errorSchema }],
     },

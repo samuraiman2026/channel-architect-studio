@@ -45,6 +45,7 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     await login(page, 'superadmin')
     await page.goto('/backend/channel-architect')
     await expect(page.getByRole('heading', { name: 'Partner programs' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New program' })).toBeVisible()
 
     const createdResponse = await page.request.post('/api/channel_architect/programs', { data: createPayload })
     expect(createdResponse.status()).toBe(201)
@@ -65,6 +66,15 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     expect(programList).toMatchObject({ page: 1, pageSize: 25 })
     expect(programList.total).toBeGreaterThanOrEqual(1)
     expect(programList.items.some((item: { id: string }) => item.id === created.programId)).toBe(true)
+    const filteredProgramsResponse = await page.request.get(`/api/channel_architect/programs?search=${encodeURIComponent(programName)}&status=draft`)
+    expect(filteredProgramsResponse.status()).toBe(200)
+    const filteredPrograms = await filteredProgramsResponse.json()
+    expect(filteredPrograms.total).toBe(1)
+    expect(filteredPrograms.items[0].id).toBe(created.programId)
+    await page.goto('/backend/channel-architect')
+    await page.getByRole('button', { name: new RegExp(programName) }).click()
+    await expect(page.getByRole('heading', { name: programName })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve version' })).toHaveCount(0)
 
     const organizationResponse = await page.request.post('/api/directory/organizations', {
       data: { name: `${programName} separate organization` },
@@ -98,6 +108,10 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     const reviewerPage = await browser.newPage()
     try {
       await login(reviewerPage, 'admin')
+      await reviewerPage.goto('/backend/channel-architect')
+      await reviewerPage.getByRole('button', { name: new RegExp(programName) }).click()
+      await expect(reviewerPage.getByRole('heading', { name: programName })).toBeVisible()
+      await expect(reviewerPage.getByRole('button', { name: 'Approve version' })).toBeVisible()
       const reviewResponse = await reviewerPage.request.post(
         `/api/channel_architect/programs/${created.versionId}/review`,
         { data: { decision: 'approved', rationale: 'Acceptance test reviewer approved the current version.' } },
@@ -142,6 +156,13 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     const employeePage = await browser.newPage()
     try {
       await login(employeePage, 'employee')
+      await employeePage.goto('/backend/channel-architect')
+      await expect(employeePage.getByRole('heading', { name: 'Partner programs' })).toBeVisible()
+      await expect(employeePage.getByRole('button', { name: 'New program' })).toHaveCount(0)
+      await employeePage.getByRole('button', { name: new RegExp(programName) }).click()
+      await expect(employeePage.getByRole('heading', { name: programName })).toBeVisible()
+      await expect(employeePage.getByRole('button', { name: 'Create revision' })).toHaveCount(0)
+      await expect(employeePage.getByRole('button', { name: 'Approve version' })).toHaveCount(0)
       const listResponse = await employeePage.request.get('/api/channel_architect/programs')
       expect(listResponse.status()).toBe(200)
       const list = await listResponse.json()
@@ -189,6 +210,9 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
         programName,
         programVersionNumber: 1,
       })
+      await pilotViewerPage.goto('/backend/channel-architect')
+      await expect(pilotViewerPage.getByRole('heading', { name: pilotPayload.name })).toBeVisible()
+      await expect(pilotViewerPage.getByRole('button', { name: 'Start' })).toHaveCount(0)
     } finally {
       await pilotViewerPage.close()
     }
