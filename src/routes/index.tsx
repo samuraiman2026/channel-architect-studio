@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { SCENARIO_LIST } from "@/lib/scenarios";
 import type { AxisSettings, Scenario, SectionKey } from "@/lib/types";
-import { generateDesign, validateDesignInputs, type Sections } from "@/lib/designEngine";
+import {
+  DESIGN_ENGINE_VERSION,
+  generateDesign,
+  validateDesignInputs,
+  type Sections,
+} from "@/lib/designEngine";
 import { ScenarioCard } from "@/components/ScenarioCard";
 import { AxisControls } from "@/components/AxisControls";
 import { OutputSection } from "@/components/OutputSection";
@@ -28,6 +33,7 @@ interface SavedDraft {
   id: string;
   programId: string;
   version: number;
+  engineVersion: string;
   savedAt: string;
   owner: string;
   status: "draft" | "approved";
@@ -81,6 +87,8 @@ function ChannelArchitect() {
             ...item,
             programId: typeof item.programId === "string" ? item.programId : item.id,
             version: typeof item.version === "number" ? item.version : 1,
+            engineVersion:
+              typeof item.engineVersion === "string" ? item.engineVersion : "legacy-unversioned",
             owner: typeof item.owner === "string" ? item.owner : "Local browser user",
             status: item.status === "approved" ? ("approved" as const) : ("draft" as const),
           }));
@@ -121,6 +129,7 @@ function ChannelArchitect() {
       id: crypto.randomUUID(),
       programId: programId || crypto.randomUUID(),
       version,
+      engineVersion: DESIGN_ENGINE_VERSION,
       savedAt: new Date().toISOString(),
       owner: owner.trim(),
       status: "draft",
@@ -399,6 +408,9 @@ function OutputView({
                 </span>
                 <span>
                   Version: <strong>v{draft.version}</strong>
+                </span>
+                <span>
+                  Design rules: <strong>{draft.engineVersion}</strong>
                 </span>
                 <span>
                   Status: <strong>{draft.status}</strong>
