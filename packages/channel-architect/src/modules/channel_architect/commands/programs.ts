@@ -84,6 +84,7 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
       deletedAt: null,
     })
     if (!program) throw notFound('Program not found')
+    if (program.status === 'archived') throw new CrudHttpError(409, { error: 'Archived programs cannot be revised.' })
     const nextVersion = parsed.expectedVersion + 1
     const version = em.create(ChannelArchitectProgramVersion, {
       id: randomUUID(),
@@ -104,6 +105,7 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
         currentVersionNumber: parsed.expectedVersion,
+        status: program.status,
         isActive: true,
         deletedAt: null,
       }, { currentVersionNumber: nextVersion, updatedAt: new Date() })
