@@ -7,7 +7,7 @@
 
 ## Implementation status
 
-The shared deterministic engine, scenario presets, package scaffold, tenant-scoped entities, validators, commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. Open Mercato 0.6.x sandbox generation discovered the module routes, entities, and page. A standalone-layout check confirmed installed-package resolution and runtime loading of the three entities; it caught and fixed the package's decorator transform. The full host typecheck is not clean because of unrelated sandbox errors; targeted output has no remaining Channel Architect diagnostics. Migration generation and end-to-end host workflow validation remain open.
+The shared deterministic engine, scenario presets, package scaffold, tenant-scoped program/review and pilot entities, validators, registered commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. Open Mercato 0.6.x sandbox generation discovered the original module routes, entities, and page. A standalone-layout check confirmed installed-package resolution and runtime loading of the three original program entities; it caught and fixed the package's decorator transform. The Studio workspace typecheck passes after the pilot slice. The full host typecheck is not clean because of unrelated sandbox errors. Migration generation and end-to-end host workflow validation remain open.
 
 ## Outcome
 
@@ -17,7 +17,7 @@ Evolve Channel Architect Studio from a single-browser planning prototype into an
 
 - This module helps teams form and govern partner-program hypotheses. It does not claim that generated recommendations are validated benchmarks or forecasts.
 - Planning-emphasis percentages are not commissions, margin, attribution, or revenue credit.
-- Partner CRM, opportunities, pilots, enrollments, and payout execution are later capabilities. The first release does not mutate CRM or financial records.
+- Pilot tracking is an initial execution capability, bound to an approved program version. Partner CRM, opportunity attribution, enrollments, and payout execution remain later capabilities. The module does not mutate CRM or financial records.
 - The Open Mercato module is an extension package. Do not fork or patch Open Mercato core for this product.
 - Browser-local drafts are untrusted imports and remain clearly marked as local and unapproved.
 
@@ -37,12 +37,18 @@ Append-only record attached to one immutable version, with approved/rejected dec
 
 Use scalar IDs between module records and other modules. Do not create cross-module ORM relationships.
 
+### Pilot and checkpoint
+
+A pilot is scoped to a tenant and organization and references one approved, current program version by ID. It records a name, cohort label, owner, target dates, lifecycle status, and final continue/revise/stop outcome. Checkpoints are separate scoped records with an ordered title, due date, and planned/completed/skipped status. Do not put individual partner/customer details or free-text personal notes in this first version.
+
 ## Workflows
 
 1. An authorized user creates a program. The server derives tenant, organization, and actor from the authenticated request, validates the submitted design inputs, runs the versioned deterministic engine, and atomically stores the program and version 1.
 2. An authorized manager revises the design. The server creates a new immutable version and updates the stable program's current version atomically. Concurrent revision attempts must not silently produce duplicate or out-of-order versions.
 3. A separate authorized reviewer approves or rejects a specific version with rationale. Decisions are immutable. A reviewer cannot decide a version outside the active tenant/organization scope.
-4. The UI shows version history and clearly distinguishes draft, approved, rejected, and superseded states. Approval is not inherited by a later version.
+4. An authorized user can create a planned pilot only from the program's current approved version. Pilot creation snapshots that version ID, owner, cohort, date range, and at least one checkpoint.
+5. Pilot operators move planned pilots to active or cancelled, pause/resume active pilots, and complete or skip checkpoints. A pilot can be completed only after every checkpoint is resolved, with an explicit continue/revise/stop outcome. Terminal states cannot be reopened.
+6. The UI shows version history and clearly distinguishes draft, approved, rejected, and superseded states. Approval is not inherited by a later version.
 
 ## Authorization and data safety
 
@@ -61,6 +67,7 @@ Use scalar IDs between module records and other modules. Do not create cross-mod
 - Define Open Mercato ACL and tenant setup defaults.
 - Add persistent Program, ProgramVersion, and ReviewDecision entities, validators, scoped command handlers, and authenticated API routes.
 - Add a backend list/create/detail/review experience with version history.
+- Add persistent Pilot and PilotCheckpoint entities, authenticated create/list/status/checkpoint routes, and a backend pilot workflow. Require the current version to be approved and all checkpoints to be resolved before recording an outcome.
 - Produce module migration artifacts for the host. Do not apply migrations to any environment without an explicit request.
 - Add host-install documentation and record the tested Open Mercato version.
 
@@ -71,6 +78,8 @@ Use scalar IDs between module records and other modules. Do not create cross-mod
 - A user in another tenant or organization cannot list, retrieve, revise, or review the program by guessing IDs.
 - Every persisted version can be regenerated from its stored input and engine version, and prior versions remain unchanged after revisions.
 - Only an authorized reviewer can create one immutable decision for a specific version.
+- A pilot can only reference the current approved version at creation; concurrent program revision cannot make the pilot stale during creation.
+- Pilot state transitions are constrained, checkpoints are tenant-scoped, and a completed pilot records one explicit continue/revise/stop outcome.
 - A rejected or superseded version cannot be represented as the current approved version.
 - Generated prose is labeled as a hypothesis; no payout, forecast, or attribution authority is implied.
 - Host compatibility is verified against Open Mercato 0.6.x before calling the module installable.
