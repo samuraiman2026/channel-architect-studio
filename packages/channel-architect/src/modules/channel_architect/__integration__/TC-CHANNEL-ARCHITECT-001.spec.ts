@@ -175,7 +175,12 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
       const pilotsResponse = await pilotViewerPage.request.get('/api/channel_architect/pilots')
       expect(pilotsResponse.status()).toBe(200)
       const pilots = await pilotsResponse.json()
-      expect(pilots.items.some((item: { id: string }) => item.id === pilot.pilotId)).toBe(true)
+      const listedPilot = pilots.items.find((item: { id: string }) => item.id === pilot.pilotId)
+      expect(listedPilot).toMatchObject({
+        id: pilot.pilotId,
+        programName,
+        programVersionNumber: 1,
+      })
     } finally {
       await pilotViewerPage.close()
     }

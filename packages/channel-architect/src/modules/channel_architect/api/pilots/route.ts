@@ -8,7 +8,12 @@ import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
 import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/directory/utils/organizationScope'
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
-import { ChannelArchitectPilot, ChannelArchitectPilotCheckpoint } from '../../data/entities'
+import {
+  ChannelArchitectPilot,
+  ChannelArchitectPilotCheckpoint,
+  ChannelArchitectProgram,
+  ChannelArchitectProgramVersion,
+} from '../../data/entities'
 import { pilotCreateSchema } from '../../data/validators'
 
 export const metadata = {
@@ -59,14 +64,37 @@ export async function GET(req: Request) {
     const checkpoints = pilotIds.length
       ? await em.find(ChannelArchitectPilotCheckpoint, { pilotId: { $in: pilotIds }, tenantId, organizationId, isActive: true, deletedAt: null }, { orderBy: { sortOrder: 'ASC' } })
       : []
+    const versionIds = [...new Set(items.map((pilot) => pilot.programVersionId))]
+    const versions = versionIds.length
+      ? await em.find(ChannelArchitectProgramVersion, {
+        id: { $in: versionIds }, tenantId, organizationId, isActive: true, deletedAt: null,
+      })
+      : []
+    const programIds = [...new Set(versions.map((version) => version.programId))]
+    const programs = programIds.length
+      ? await em.find(ChannelArchitectProgram, {
+        id: { $in: programIds }, tenantId, organizationId, isActive: true, deletedAt: null,
+      })
+      : []
     const checkpointsByPilot = new Map<string, ChannelArchitectPilotCheckpoint[]>()
     for (const checkpoint of checkpoints) {
       const list = checkpointsByPilot.get(checkpoint.pilotId) ?? []
       list.push(checkpoint)
       checkpointsByPilot.set(checkpoint.pilotId, list)
     }
+    const versionsById = new Map(versions.map((version) => [version.id, version]))
+    const programsById = new Map(programs.map((program) => [program.id, program]))
     return NextResponse.json({
-      items: items.map((pilot) => ({ ...pilot, checkpoints: checkpointsByPilot.get(pilot.id) ?? [] })),
+      items: items.map((pilot) => {
+        const version = versionsById.get(pilot.programVersionId)
+        const program = version ? programsById.get(version.programId) : undefined
+        return {
+          ...pilot,
+          programName: program?.name ?? 'Unavailable program',
+          programVersionNumber: version?.versionNumber ?? null,
+          checkpoints: checkpointsByPilot.get(pilot.id) ?? [],
+        }
+      }),
       totalCount,
       page,
       pageSize,

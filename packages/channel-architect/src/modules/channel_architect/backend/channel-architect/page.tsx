@@ -41,6 +41,8 @@ type Pilot = {
   cohortLabel: string
   ownerUserId: string
   programVersionId: string
+  programName: string
+  programVersionNumber: number | null
   status: 'planned' | 'active' | 'paused' | 'completed' | 'cancelled'
   outcome: 'continue' | 'revise' | 'stop' | null
   targetStartDate: string
@@ -471,7 +473,7 @@ export default function ChannelArchitectProgramsPage() {
               <ul className="space-y-3">
                 {pilots.map((pilot) => <li key={pilot.id} className="rounded-md border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div><h3 className="font-medium">{pilot.name}</h3><p className="text-sm text-muted-foreground">{pilot.cohortLabel} · owner {pilot.ownerUserId} · {pilot.targetStartDate.slice(0, 10)}{pilot.targetEndDate ? ` to ${pilot.targetEndDate.slice(0, 10)}` : ''}</p><p className="mt-1 text-xs text-muted-foreground">Program version {detail?.versions.find((version) => version.id === pilot.programVersionId)?.versionNumber ?? 'linked'} · {pilot.status}{pilot.outcome ? ` · outcome: ${pilot.outcome}` : ''}</p></div>
+                    <div><h3 className="font-medium">{pilot.name}</h3><p className="text-sm text-muted-foreground">{pilot.cohortLabel} · owner {pilot.ownerUserId} · {pilot.targetStartDate.slice(0, 10)}{pilot.targetEndDate ? ` to ${pilot.targetEndDate.slice(0, 10)}` : ''}</p><p className="mt-1 text-xs text-muted-foreground">{pilot.programName} · version {pilot.programVersionNumber ?? 'unavailable'} · {pilot.status}{pilot.outcome ? ` · outcome: ${pilot.outcome}` : ''}</p></div>
                     <div className="flex flex-wrap gap-2">
                       {pilot.status === 'planned' && <><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'active')}>Start</button><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'cancelled')}>Cancel</button></>}
                       {pilot.status === 'active' && <><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'paused')}>Pause</button><button className="rounded border px-3 py-1.5 text-sm" onClick={() => void updatePilot(pilot, 'cancelled')}>Cancel</button>{(['continue', 'revise', 'stop'] as const).map((outcome) => <button key={outcome} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50" disabled={pilot.checkpoints.some((checkpoint) => checkpoint.status === 'planned')} onClick={() => void updatePilot(pilot, 'completed', outcome)}>Complete: {outcome}</button>)}</>}
