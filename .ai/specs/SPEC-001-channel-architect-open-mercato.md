@@ -5,6 +5,10 @@
 **Module package:** `@open-mercato/channel-architect`
 **Module ID:** `channel_architect`
 
+## Implementation status
+
+The shared deterministic engine, scenario presets, package scaffold, tenant-scoped entities, validators, commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. They have not yet been typechecked or run inside an Open Mercato 0.6.x host. Migration generation and host workflow validation remain open.
+
 ## Outcome
 
 Evolve Channel Architect Studio from a single-browser planning prototype into an installable Open Mercato module for designing, versioning, and reviewing partner programs. Preserve the standalone Studio experience while making one deterministic design engine the source of truth.
