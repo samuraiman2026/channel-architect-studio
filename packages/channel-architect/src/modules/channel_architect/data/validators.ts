@@ -46,6 +46,10 @@ export const programRevisionSchema = z.object({
   settings: axisSettingsSchema,
 })
 
+export const programArchiveSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+})
+
 export const programReviewSchema = z.object({
   decision: z.enum(['approved', 'rejected']),
   rationale: z.string().trim().min(1).max(8000),

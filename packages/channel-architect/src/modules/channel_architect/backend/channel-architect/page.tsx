@@ -206,6 +206,22 @@ export default function ChannelArchitectProgramsPage() {
     if (mode === 'revise' && detail) await openProgram(detail.program)
   }
 
+  async function archiveProgram(program: Program) {
+    if (!window.confirm(`Archive “${program.name}”? Its version and review history will remain available, but no new pilots can be started.`)) return
+    const response = await apiCall(API, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'archive', programId: program.id, expectedVersion: program.currentVersionNumber }),
+    }, {})
+    if (!response.ok || !response.result) {
+      setNotice(messageFrom(response.result, 'Could not archive this program. Reload and try again.'))
+      return
+    }
+    setNotice('Program archived. Its version and review history are unchanged.')
+    await refreshPrograms()
+    await openProgram(program)
+  }
+
   async function decide(decision: 'approved' | 'rejected') {
     if (!selectedVersion) return
     const response = await apiCall(`${API}/${encodeURIComponent(selectedVersion.id)}/review`, {
@@ -380,7 +396,10 @@ export default function ChannelArchitectProgramsPage() {
                 <div className="space-y-5">
                   <header className="flex flex-wrap items-start justify-between gap-3">
                     <div><h2 className="text-xl font-semibold">{detail.program.name}</h2><p className="text-xs text-muted-foreground">Owner user ID: {detail.program.ownerUserId}</p></div>
-                    <button className="rounded-md border px-3 py-2 text-sm" onClick={beginRevision}>Create revision</button>
+                    {detail.program.status !== 'archived' ? <div className="flex gap-2">
+                      <button className="rounded-md border px-3 py-2 text-sm" onClick={beginRevision}>Create revision</button>
+                      <button className="rounded-md border px-3 py-2 text-sm" onClick={() => void archiveProgram(detail.program)}>Archive program</button>
+                    </div> : <span className="rounded border px-3 py-2 text-sm text-muted-foreground">Archived</span>}
                   </header>
                   <div className="flex flex-wrap gap-2">
                     {detail.versions.map((version) => {

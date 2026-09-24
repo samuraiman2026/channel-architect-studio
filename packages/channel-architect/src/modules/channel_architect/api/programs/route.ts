@@ -9,7 +9,7 @@ import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/d
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
 import { ChannelArchitectProgram, ChannelArchitectProgramReview, ChannelArchitectProgramVersion } from '../../data/entities'
-import { programCreateSchema, programRevisionSchema } from '../../data/validators'
+import { programArchiveSchema, programCreateSchema, programRevisionSchema } from '../../data/validators'
 
 const resourceKind = 'channel_architect.program'
 
@@ -118,7 +118,8 @@ export async function PATCH(req: Request) {
     const context = await getContext(req)
     const body = await req.json()
     const programId = z.string().uuid().parse(body.programId)
-    const input = programRevisionSchema.parse(body)
+    const isArchive = body.action === 'archive'
+    const input = isArchive ? programArchiveSchema.parse(body) : programRevisionSchema.parse(body)
     const guard = await validateCrudMutationGuard(context.container, {
       tenantId: context.tenantId,
       organizationId: context.organizationId,
@@ -132,10 +133,14 @@ export async function PATCH(req: Request) {
     })
     if (guard && !guard.ok) return NextResponse.json(guard.body, { status: guard.status })
     const bus = context.container.resolve('commandBus') as CommandBus
-    const { result } = await bus.execute<typeof input & { programId: string; tenantId: string; organizationId: string }, { versionId: string; version: number }>(
-      'channel_architect.programs.revise',
-      { input: { ...input, programId, tenantId: context.tenantId, organizationId: context.organizationId }, ctx: context.ctx },
-    )
+    const commandInput = { ...input, programId, tenantId: context.tenantId, organizationId: context.organizationId }
+    const { result } = isArchive
+      ? await bus.execute<typeof commandInput, { programId: string; status: 'archived' }>(
+        'channel_architect.programs.archive', { input: commandInput, ctx: context.ctx },
+      )
+      : await bus.execute<typeof commandInput, { versionId: string; version: number }>(
+        'channel_architect.programs.revise', { input: commandInput, ctx: context.ctx },
+      )
     if (guard?.ok && guard.shouldRunAfterSuccess) {
       await runCrudMutationGuardAfterSuccess(context.container, {
         tenantId: context.tenantId,
@@ -174,9 +179,12 @@ export const openApi: OpenApiRouteDoc = {
     },
     PATCH: {
       summary: 'Append a new program version',
-      requestBody: { contentType: 'application/json', schema: programRevisionSchema.extend({ programId: z.string().uuid() }) },
-      responses: [{ status: 200, description: 'Version created', schema: z.object({ versionId: z.string(), version: z.number() }) }],
-      errors: [{ status: 409, description: 'Program version changed concurrently', schema: errorSchema }],
+      requestBody: { contentType: 'application/json', schema: z.union([
+        programRevisionSchema.extend({ programId: z.string().uuid() }),
+        programArchiveSchema.extend({ programId: z.string().uuid(), action: z.literal('archive') }),
+      ]) },
+      responses: [{ status: 200, description: 'Version created or program archived', schema: z.record(z.string(), z.unknown()) }],
+      errors: [{ status: 409, description: 'Program version changed concurrently or program is already archived', schema: errorSchema }],
     },
   },
 }

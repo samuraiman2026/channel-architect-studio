@@ -12,6 +12,7 @@ import {
 } from '../data/entities'
 import {
   programCreateSchema,
+  programArchiveSchema,
   programRevisionSchema,
   programReviewSchema,
 } from '../data/validators'
@@ -20,6 +21,7 @@ import { ensureOrganizationScope, ensureTenantScope } from './scope'
 type ProgramScope = { tenantId: string; organizationId: string }
 type CreateProgramInput = ProgramScope & { name: string; scenario: unknown; settings: unknown }
 type ReviseProgramInput = ProgramScope & { programId: string; expectedVersion: number; scenario: unknown; settings: unknown }
+type ArchiveProgramInput = ProgramScope & { programId: string; expectedVersion: number }
 type ReviewProgramInput = ProgramScope & { programVersionId: string; decision: 'approved' | 'rejected'; rationale: string }
 
 const createProgram: CommandHandler<CreateProgramInput, { programId: string; versionId: string; version: number }> = {
@@ -112,6 +114,39 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
   },
 }
 
+const archiveProgram: CommandHandler<ArchiveProgramInput, { programId: string; status: 'archived' }> = {
+  id: 'channel_architect.programs.archive',
+  async execute(raw, ctx) {
+    const parsed = programArchiveSchema.parse(raw)
+    ensureTenantScope(ctx, raw.tenantId)
+    ensureOrganizationScope(ctx, raw.organizationId)
+    const em = (ctx.container.resolve('em') as EntityManager).fork()
+    const program = await em.findOne(ChannelArchitectProgram, {
+      id: raw.programId,
+      tenantId: raw.tenantId,
+      organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
+    })
+    if (!program) throw notFound('Program not found')
+    if (program.status === 'archived') throw new CrudHttpError(409, { error: 'Program is already archived.' })
+
+    await withAtomicFlush(em, [async () => {
+      const updated = await em.nativeUpdate(ChannelArchitectProgram, {
+        id: program.id,
+        tenantId: raw.tenantId,
+        organizationId: raw.organizationId,
+        currentVersionNumber: parsed.expectedVersion,
+        status: program.status,
+        isActive: true,
+        deletedAt: null,
+      }, { status: 'archived', updatedAt: new Date() })
+      if (updated !== 1) throw new CrudHttpError(409, { error: 'Program changed before it could be archived. Reload and try again.' })
+    }], { transaction: true })
+    return { programId: program.id, status: 'archived' }
+  },
+}
+
 const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = {
   id: 'channel_architect.programs.review',
   async execute(raw, ctx) {
@@ -158,13 +193,27 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       rationale: parsed.rationale,
       reviewerUserId: actorId,
     })
-    await withAtomicFlush(em, [async () => { em.persist(review) }], { transaction: true })
+    await withAtomicFlush(em, [async () => {
+      em.persist(review)
+      if (parsed.decision === 'approved') {
+        await em.nativeUpdate(ChannelArchitectProgram, {
+          id: program.id,
+          tenantId: raw.tenantId,
+          organizationId: raw.organizationId,
+          currentVersionNumber: version.versionNumber,
+          status: 'draft',
+          isActive: true,
+          deletedAt: null,
+        }, { status: 'active', updatedAt: new Date() })
+      }
+    }], { transaction: true })
     return { reviewId: review.id }
   },
 }
 
 registerCommand(createProgram)
 registerCommand(reviseProgram)
+registerCommand(archiveProgram)
 registerCommand(reviewProgram)
 
-export { createProgram, reviseProgram, reviewProgram }
+export { createProgram, reviseProgram, archiveProgram, reviewProgram }
