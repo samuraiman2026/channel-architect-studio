@@ -7,7 +7,7 @@
 
 ## Implementation status
 
-The shared deterministic engine, scenario presets, package scaffold, tenant-scoped entities, validators, commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. A temporary Open Mercato 0.6.x sandbox discovered the module routes, entities, and page. The full host typecheck is not clean because of unrelated sandbox errors; targeted output has no remaining Channel Architect diagnostics. Migration generation and end-to-end host workflow validation remain open.
+The shared deterministic engine, scenario presets, package scaffold, tenant-scoped entities, validators, commands, guarded API routes, and initial backend workspace are implemented in the Studio repository. Open Mercato 0.6.x sandbox generation discovered the module routes, entities, and page. A standalone-layout check confirmed installed-package resolution and runtime loading of the three entities; it caught and fixed the package's decorator transform. The full host typecheck is not clean because of unrelated sandbox errors; targeted output has no remaining Channel Architect diagnostics. Migration generation and end-to-end host workflow validation remain open.
 
 ## Outcome
 
