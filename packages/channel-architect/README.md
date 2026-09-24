@@ -10,6 +10,24 @@ The host-discoverable Playwright acceptance scenario is in `src/modules/channel_
 
 It also creates a separate organization and verifies that an admin scoped to the original organization cannot access that organization's program using a guessed ID. This check is implemented in the acceptance scenario but has not yet been run against a migrated host.
 
+## Connect to a local Open Mercato host
+
+Build this package first from the Channel Architect Studio repository root:
+
+```sh
+npm run build --prefix packages/channel-architect
+```
+
+Then, from the root of a standalone Open Mercato 0.6.x host, add the local package and enable the module:
+
+```sh
+yarn add @open-mercato/channel-architect@file:/absolute/path/to/channel-architect-studio/packages/channel-architect
+yarn mercato module enable @open-mercato/channel-architect
+yarn generate
+```
+
+Before applying the migration, point `DATABASE_URL` at a fresh disposable PostgreSQL database and review the generated migration. Then run `yarn mercato db:migrate`, start the host, and execute the host's Playwright integration runner for `TC-CHANNEL-ARCHITECT-001`. For an already provisioned host, run `yarn mercato auth sync-role-acls` so existing roles receive the module's feature grants. Do not apply this migration to production as part of the acceptance run.
+
 Program and pilot lists are tenant- and organization-scoped, paginated, searchable by name, and filterable by lifecycle status. The pilot list also resolves each pilot's program name and immutable version number, so pilots remain attributable to the right design even when another program is selected. Saving a program opens its persisted detail and version history. The backend UI reads Open Mercato feature grants to show role-appropriate controls, while every mutation remains enforced by the server.
 
 Generated partner-program content is a planning hypothesis. It is not a benchmark, forecast, commercial offer, commission schedule, or source of attribution truth.
