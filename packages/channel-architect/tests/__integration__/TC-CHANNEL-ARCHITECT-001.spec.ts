@@ -72,6 +72,11 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
         { data: { decision: 'approved', rationale: 'Acceptance test reviewer approved the current version.' } },
       )
       expect(reviewResponse.status()).toBe(201)
+      const duplicateReviewResponse = await reviewerPage.request.post(
+        `/api/channel_architect/programs/${created.versionId}/review`,
+        { data: { decision: 'rejected', rationale: 'A final decision already exists.' } },
+      )
+      expect(duplicateReviewResponse.status()).toBe(409)
     } finally {
       await reviewerPage.close()
     }
@@ -87,6 +92,11 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
         data: { ...createPayload, name: `${programName} unauthorized` },
       })
       expect(deniedCreateResponse.status()).toBe(403)
+      const deniedReviewResponse = await employeePage.request.post(
+        `/api/channel_architect/programs/${created.versionId}/review`,
+        { data: { decision: 'rejected', rationale: 'Employee does not have review permission.' } },
+      )
+      expect(deniedReviewResponse.status()).toBe(403)
     } finally {
       await employeePage.close()
     }
@@ -106,6 +116,17 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
     expect(pilotResponse.status()).toBe(201)
     const pilot = await pilotResponse.json() as PilotCreated
     expect(pilot.checkpointIds).toHaveLength(1)
+
+    const pilotViewerPage = await browser.newPage()
+    try {
+      await login(pilotViewerPage, 'employee')
+      const pilotsResponse = await pilotViewerPage.request.get('/api/channel_architect/pilots')
+      expect(pilotsResponse.status()).toBe(200)
+      const pilots = await pilotsResponse.json()
+      expect(pilots.items.some((item: { id: string }) => item.id === pilot.pilotId)).toBe(true)
+    } finally {
+      await pilotViewerPage.close()
+    }
 
     const activateResponse = await page.request.patch(`/api/channel_architect/pilots/${pilot.pilotId}`, {
       data: { status: 'active' },
