@@ -210,6 +210,11 @@ test.describe('TC-CHANNEL-ARCHITECT-001: governed program and pilot workflow', (
         programName,
         programVersionNumber: 1,
       })
+      const filteredPilotsResponse = await pilotViewerPage.request.get(`/api/channel_architect/pilots?search=${encodeURIComponent(pilotPayload.name)}&status=planned`)
+      expect(filteredPilotsResponse.status()).toBe(200)
+      const filteredPilots = await filteredPilotsResponse.json()
+      expect(filteredPilots.totalCount).toBe(1)
+      expect(filteredPilots.items[0].id).toBe(pilot.pilotId)
       await pilotViewerPage.goto('/backend/channel-architect')
       await expect(pilotViewerPage.getByRole('heading', { name: pilotPayload.name })).toBeVisible()
       await expect(pilotViewerPage.getByRole('button', { name: 'Start' })).toHaveCount(0)

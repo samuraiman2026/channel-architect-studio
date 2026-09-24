@@ -10,7 +10,7 @@ The host-discoverable Playwright acceptance scenario is in `src/modules/channel_
 
 It also creates a separate organization and verifies that an admin scoped to the original organization cannot access that organization's program using a guessed ID. This check is implemented in the acceptance scenario but has not yet been run against a migrated host.
 
-Program and pilot lists are tenant- and organization-scoped and paginated. Programs can be searched by name and filtered by lifecycle status. The pilot list also resolves each pilot's program name and immutable version number, so pilots remain attributable to the right design even when another program is selected. Saving a program opens its persisted detail and version history. The backend UI reads Open Mercato feature grants to show role-appropriate controls, while every mutation remains enforced by the server.
+Program and pilot lists are tenant- and organization-scoped, paginated, searchable by name, and filterable by lifecycle status. The pilot list also resolves each pilot's program name and immutable version number, so pilots remain attributable to the right design even when another program is selected. Saving a program opens its persisted detail and version history. The backend UI reads Open Mercato feature grants to show role-appropriate controls, while every mutation remains enforced by the server.
 
 Generated partner-program content is a planning hypothesis. It is not a benchmark, forecast, commercial offer, commission schedule, or source of attribution truth.
 

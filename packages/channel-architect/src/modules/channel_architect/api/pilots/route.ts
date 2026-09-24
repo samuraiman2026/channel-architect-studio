@@ -8,6 +8,7 @@ import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
 import { resolveOrganizationScopeForRequest } from '@open-mercato/core/modules/directory/utils/organizationScope'
 import { CrudHttpError, isCrudHttpError } from '@open-mercato/shared/lib/crud/errors'
 import { validateCrudMutationGuard, runCrudMutationGuardAfterSuccess } from '@open-mercato/shared/lib/crud/mutation-guard'
+import { escapeLikePattern } from '@open-mercato/shared/lib/db/escapeLikePattern'
 import {
   ChannelArchitectPilot,
   ChannelArchitectPilotCheckpoint,
@@ -55,7 +56,17 @@ export async function GET(req: Request) {
     const rawPageSize = Number(params.get('pageSize') ?? 25)
     const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
     const pageSize = Number.isFinite(rawPageSize) ? Math.min(100, Math.max(1, Math.floor(rawPageSize))) : 25
-    const where = { tenantId, organizationId, isActive: true, deletedAt: null }
+    const search = z.string().trim().max(120).optional().parse(params.get('search') || undefined)
+    const status = z.enum(['planned', 'active', 'paused', 'completed', 'cancelled']).optional().parse(params.get('status') || undefined)
+    const escapedSearch = search ? escapeLikePattern(search) : undefined
+    const where = {
+      tenantId,
+      organizationId,
+      isActive: true,
+      deletedAt: null,
+      ...(status ? { status } : {}),
+      ...(escapedSearch ? { name: { $ilike: `%${escapedSearch}%` } } : {}),
+    }
     const [items, totalCount] = await Promise.all([
       em.find(ChannelArchitectPilot, where, { orderBy: { updatedAt: 'DESC' }, limit: pageSize, offset: (page - 1) * pageSize }),
       em.count(ChannelArchitectPilot, where),
@@ -150,7 +161,7 @@ export const openApi: OpenApiRouteDoc = {
   methods: {
     GET: {
       summary: 'List pilots and their checkpoints',
-      query: z.object({ page: z.coerce.number().int().positive().optional(), pageSize: z.coerce.number().int().min(1).max(100).optional() }),
+      query: z.object({ page: z.coerce.number().int().positive().optional(), pageSize: z.coerce.number().int().min(1).max(100).optional(), search: z.string().trim().max(120).optional(), status: z.enum(['planned', 'active', 'paused', 'completed', 'cancelled']).optional() }),
       responses: [{ status: 200, description: 'Scoped pilot records', schema: z.object({ items: z.array(z.unknown()), totalCount: z.number(), page: z.number(), pageSize: z.number() }) }],
     },
     POST: {

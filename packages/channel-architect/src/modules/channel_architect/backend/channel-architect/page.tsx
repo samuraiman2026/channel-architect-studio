@@ -99,6 +99,9 @@ export default function ChannelArchitectProgramsPage() {
   const [pilots, setPilots] = React.useState<Pilot[]>([])
   const [pilotPage, setPilotPage] = React.useState(1)
   const [pilotTotalCount, setPilotTotalCount] = React.useState(0)
+  const [pilotSearchInput, setPilotSearchInput] = React.useState('')
+  const [pilotSearch, setPilotSearch] = React.useState('')
+  const [pilotStatus, setPilotStatus] = React.useState<'all' | Pilot['status']>('all')
   const [pilotName, setPilotName] = React.useState('')
   const [cohortLabel, setCohortLabel] = React.useState('')
   const [pilotStartDate, setPilotStartDate] = React.useState('')
@@ -200,7 +203,10 @@ export default function ChannelArchitectProgramsPage() {
   }, [programSearchInput])
 
   const refreshPilots = React.useCallback(async (page = pilotPage) => {
-    const response = await apiCall(`${PILOT_API}?page=${page}&pageSize=${PILOT_PAGE_SIZE}`, undefined, {})
+    const params = new URLSearchParams({ page: String(page), pageSize: String(PILOT_PAGE_SIZE) })
+    if (pilotSearch) params.set('search', pilotSearch)
+    if (pilotStatus !== 'all') params.set('status', pilotStatus)
+    const response = await apiCall(`${PILOT_API}?${params.toString()}`, undefined, {})
     if (response.ok && response.result) {
       const result = response.result as { items?: Pilot[]; totalCount?: number }
       setPilots(result.items ?? [])
@@ -208,9 +214,17 @@ export default function ChannelArchitectProgramsPage() {
     } else {
       setNotice(messageFrom(response.result, 'Unable to load partner pilots.'))
     }
-  }, [pilotPage])
+  }, [pilotPage, pilotSearch, pilotStatus])
 
   React.useEffect(() => { void refreshPilots() }, [refreshPilots])
+
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPilotSearch(pilotSearchInput.trim())
+      setPilotPage(1)
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [pilotSearchInput])
 
   async function openProgram(program: Program) {
     setNotice('')
@@ -355,7 +369,11 @@ export default function ChannelArchitectProgramsPage() {
     setPilotEndDate('')
     setCheckpointDrafts([{ title: '', dueDate: '' }])
     setNotice('Pilot and checkpoints created from the approved version.')
-    if (pilotPage === 1) await refreshPilots(1)
+    const alreadyUnfilteredFirstPage = pilotPage === 1 && !pilotSearch && pilotStatus === 'all' && !pilotSearchInput.trim()
+    setPilotSearchInput('')
+    setPilotSearch('')
+    setPilotStatus('all')
+    if (alreadyUnfilteredFirstPage) await refreshPilots(1)
     else setPilotPage(1)
   }
 
@@ -584,7 +602,18 @@ export default function ChannelArchitectProgramsPage() {
                 <button type="button" className="rounded border px-2 py-1 disabled:opacity-50" aria-label="Next pilots page" disabled={pilotPage >= pilotPageCount} onClick={() => setPilotPage((page) => Math.min(pilotPageCount, page + 1))}>Next</button>
               </div>
             </div>
-            {pilots.length === 0 ? <p className="text-sm text-muted-foreground">No pilots yet. Approve the current version of a program to start one.</p> : (
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input aria-label="Search pilots" placeholder="Search pilot names" className="min-w-0 rounded border bg-background px-3 py-2 text-sm" value={pilotSearchInput} onChange={(event) => setPilotSearchInput(event.target.value)} maxLength={120} />
+              <select aria-label="Filter pilots by status" className="rounded border bg-background px-3 py-2 text-sm" value={pilotStatus} onChange={(event) => { setPilotStatus(event.target.value as typeof pilotStatus); setPilotPage(1) }}>
+                <option value="all">All statuses</option>
+                <option value="planned">Planned</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            {pilots.length === 0 ? <p className="text-sm text-muted-foreground">{pilotSearch || pilotStatus !== 'all' ? 'No pilots match these filters.' : 'No pilots yet. Approve the current version of a program to start one.'}</p> : (
               <ul className="space-y-3">
                 {pilots.map((pilot) => <li key={pilot.id} className="rounded-md border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
