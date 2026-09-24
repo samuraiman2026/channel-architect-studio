@@ -39,6 +39,8 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
       id: parsed.programVersionId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
     })
     if (!version) throw notFound('Approved program version not found')
 
@@ -47,11 +49,15 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
         id: version.programId,
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
+        isActive: true,
+        deletedAt: null,
       }),
       em.findOne(ChannelArchitectProgramReview, {
         programVersionId: version.id,
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
+        isActive: true,
+        deletedAt: null,
       }),
     ])
     if (!program) throw notFound('Program not found')
@@ -94,6 +100,8 @@ const createPilot: CommandHandler<CreatePilotInput, { pilotId: string; checkpoin
         id: program.id,
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
+        isActive: true,
+        deletedAt: null,
       }, { lockMode: LockMode.PESSIMISTIC_WRITE, refresh: true })
       if (!currentProgram) throw notFound('Program not found')
       if (currentProgram.status === 'archived') throw new CrudHttpError(409, { error: 'The program was archived while the pilot was being created.' })
@@ -117,6 +125,7 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
       id: raw.pilotId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
       deletedAt: null,
     })
     if (!pilot) throw notFound('Pilot not found')
@@ -129,6 +138,7 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
         pilotId: pilot.id,
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
+        isActive: true,
         deletedAt: null,
       }, { fields: ['status'] })
       if (!canCompletePilot(checkpointStatuses.map((checkpoint) => checkpoint.status))) {
@@ -141,6 +151,7 @@ const updatePilotStatus: CommandHandler<UpdatePilotInput, { pilotId: string; sta
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       status: pilot.status,
+      isActive: true,
       deletedAt: null,
     }, { status: parsed.status, outcome, updatedAt: new Date() })
     if (updated !== 1) throw new CrudHttpError(409, { error: 'Pilot changed. Reload it before updating its status.' })
@@ -159,6 +170,7 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
       id: raw.pilotId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
       deletedAt: null,
     })
     if (!pilot) throw notFound('Pilot not found')
@@ -170,6 +182,7 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
       pilotId: pilot.id,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
       deletedAt: null,
     })
     if (!checkpoint) throw notFound('Pilot checkpoint not found')
@@ -182,6 +195,7 @@ const updatePilotCheckpoint: CommandHandler<UpdateCheckpointInput, { checkpointI
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       status: 'planned',
+      isActive: true,
       deletedAt: null,
     }, {
       status: parsed.status,

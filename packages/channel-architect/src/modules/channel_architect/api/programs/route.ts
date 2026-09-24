@@ -57,16 +57,16 @@ export async function GET(req: Request) {
     const rawId = new URL(req.url).searchParams.get('id')
     const id = rawId ? z.string().uuid().parse(rawId) : null
     if (id) {
-      const program = await em.findOne(ChannelArchitectProgram, { id, tenantId, organizationId })
+      const program = await em.findOne(ChannelArchitectProgram, { id, tenantId, organizationId, isActive: true, deletedAt: null })
       if (!program) throw new CrudHttpError(404, { error: 'Program not found.' })
-      const versions = await em.find(ChannelArchitectProgramVersion, { programId: id, tenantId, organizationId }, { orderBy: { versionNumber: 'DESC' } })
+      const versions = await em.find(ChannelArchitectProgramVersion, { programId: id, tenantId, organizationId, isActive: true, deletedAt: null }, { orderBy: { versionNumber: 'DESC' } })
       const versionIds = versions.map((version) => version.id)
       const reviews = versionIds.length
-        ? await em.find(ChannelArchitectProgramReview, { programVersionId: { $in: versionIds }, tenantId, organizationId })
+        ? await em.find(ChannelArchitectProgramReview, { programVersionId: { $in: versionIds }, tenantId, organizationId, isActive: true, deletedAt: null })
         : []
       return NextResponse.json({ program, versions, reviews })
     }
-    const items = await em.find(ChannelArchitectProgram, { tenantId, organizationId }, { orderBy: { updatedAt: 'DESC' }, limit: 100 })
+    const items = await em.find(ChannelArchitectProgram, { tenantId, organizationId, isActive: true, deletedAt: null }, { orderBy: { updatedAt: 'DESC' }, limit: 100 })
     return NextResponse.json({ items, total: items.length })
   } catch (error) {
     return errorResponse(error, 'GET')

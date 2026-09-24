@@ -78,6 +78,8 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
       id: raw.programId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
     })
     if (!program) throw notFound('Program not found')
     const nextVersion = parsed.expectedVersion + 1
@@ -100,6 +102,8 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
         tenantId: raw.tenantId,
         organizationId: raw.organizationId,
         currentVersionNumber: parsed.expectedVersion,
+        isActive: true,
+        deletedAt: null,
       }, { currentVersionNumber: nextVersion, updatedAt: new Date() })
       if (updated !== 1) throw new CrudHttpError(409, { error: 'Program changed. Reload the latest version before revising.' })
       em.persist(version)
@@ -121,12 +125,16 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       id: raw.programVersionId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
     })
     if (!version) throw notFound('Program version not found')
     const program = await em.findOne(ChannelArchitectProgram, {
       id: version.programId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
     })
     if (!program) throw notFound('Program not found')
     if (program.ownerUserId === actorId || version.createdBy === actorId) {
@@ -136,6 +144,8 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       programVersionId: version.id,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
+      isActive: true,
+      deletedAt: null,
     })
     if (existing) throw new CrudHttpError(409, { error: 'This version already has a final review decision.' })
 

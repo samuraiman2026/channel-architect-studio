@@ -50,14 +50,14 @@ export async function GET(req: Request) {
     const rawPageSize = Number(params.get('pageSize') ?? 25)
     const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
     const pageSize = Number.isFinite(rawPageSize) ? Math.min(100, Math.max(1, Math.floor(rawPageSize))) : 25
-    const where = { tenantId, organizationId, deletedAt: null }
+    const where = { tenantId, organizationId, isActive: true, deletedAt: null }
     const [items, totalCount] = await Promise.all([
       em.find(ChannelArchitectPilot, where, { orderBy: { updatedAt: 'DESC' }, limit: pageSize, offset: (page - 1) * pageSize }),
       em.count(ChannelArchitectPilot, where),
     ])
     const pilotIds = items.map((pilot) => pilot.id)
     const checkpoints = pilotIds.length
-      ? await em.find(ChannelArchitectPilotCheckpoint, { pilotId: { $in: pilotIds }, tenantId, organizationId, deletedAt: null }, { orderBy: { sortOrder: 'ASC' } })
+      ? await em.find(ChannelArchitectPilotCheckpoint, { pilotId: { $in: pilotIds }, tenantId, organizationId, isActive: true, deletedAt: null }, { orderBy: { sortOrder: 'ASC' } })
       : []
     const checkpointsByPilot = new Map<string, ChannelArchitectPilotCheckpoint[]>()
     for (const checkpoint of checkpoints) {
