@@ -2,9 +2,9 @@
 
 ## Product boundary
 
-Channel Architect Studio contains two related experiences, not one shared deployment:
+Channel Architect contains two related experiences, not one shared deployment:
 
-- The standalone **The Partner Brief** app is a browser-local planning prototype. It has no login, shared database, or server-side review.
+- **The Partner Brief** is a standalone, browser-local planning tool. It has no login, shared database, or server-side review.
 - `packages/channel-architect` is an Open Mercato 0.6.x extension with authenticated, tenant- and organization-scoped programs, immutable versions, review decisions, pilots, and checkpoints.
 
 Both use the deterministic design engine in `packages/channel-architect/src/modules/channel_architect/lib/`. A draft made in the standalone app is not synchronized into Open Mercato. Local endorsement notes are not authenticated approvals.

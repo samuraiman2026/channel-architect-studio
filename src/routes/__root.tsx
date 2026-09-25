@@ -72,12 +72,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "The Partner Brief" },
+      { title: "The Partner Brief | Channel Architect" },
       {
         name: "description",
         content: "Partner program design for SaaS companies, in 60 seconds.",
       },
-      { property: "og:title", content: "The Partner Brief" },
+      { property: "og:title", content: "The Partner Brief | Channel Architect" },
       {
         property: "og:description",
         content: "Partner program design for SaaS companies, in 60 seconds.",

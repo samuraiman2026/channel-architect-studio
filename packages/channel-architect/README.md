@@ -1,10 +1,10 @@
 # Channel Architect for Open Mercato
 
-`@open-mercato/channel-architect` is an extension module for Open Mercato 0.6.x. It adds shared partner-program design, independent review, immutable version history, and pilot/checkpoint tracking. It uses the deterministic design engine shared with the standalone Studio. It does not patch or fork Open Mercato core.
+`@open-mercato/channel-architect` is an extension module for Open Mercato 0.6.x. It adds shared partner-program design, independent review, immutable version history, and pilot/checkpoint tracking. It uses the deterministic design engine shared with The Partner Brief. It does not patch or fork Open Mercato core.
 
 ## Build and install
 
-Build this package from the Channel Architect Studio repository root:
+Build this package from the Channel Architect repository root:
 
 ```sh
 bun run --cwd packages/channel-architect build
@@ -53,7 +53,7 @@ See [`demo/README.md`](demo/README.md) for the synthetic program briefs and a ro
 
 The package stores tenant- and organization-scoped programs, versions, review decisions, pilots, and checkpoints. It does not create or modify CRM partner records, opportunities, enrollments, commissions, revenue attribution, or payments. Planning-emphasis values are not commercial rates or revenue credit. Generated content is a hypothesis, not a benchmark, forecast, commercial offer, or compliance determination.
 
-The standalone Studio remains browser-local. Its saved drafts and local endorsements are not shared with this module and are not authenticated approvals. See the root [developer and user guide](../../dev_context.md), the [Open Mercato integration notes](../../docs/open-mercato-integration.md), and [SPEC-001](../../.ai/specs/SPEC-001-channel-architect-open-mercato.md).
+The Partner Brief remains browser-local. Its saved drafts and local endorsements are not shared with this module and are not authenticated approvals. See the root [developer and user guide](../../dev_context.md), the [Open Mercato integration notes](../../docs/open-mercato-integration.md), and [SPEC-001](../../.ai/specs/SPEC-001-channel-architect-open-mercato.md).
 
 ## Compatibility and verification
 

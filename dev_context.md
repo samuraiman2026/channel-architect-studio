@@ -1,6 +1,6 @@
 # Developer and user context
 
-This guide explains how to run Channel Architect Studio from a fresh download, how to use its two product surfaces, and where the current boundaries are. The project has both a browser-only planning Studio and a separate Open Mercato module. They share the design engine, but they do not share storage or identity unless the module is installed in an Open Mercato host.
+This guide explains how to run Channel Architect from a fresh download, how to use its two product surfaces, and where the current boundaries are. The Partner Brief is the standalone browser planning tool. The Channel Architect module for Open Mercato is the separate team workspace. They share the design engine, but they do not share storage or identity.
 
 ## 1. What the product does
 
@@ -22,12 +22,12 @@ The project provides two ways to use that engine:
 
 | Experience                            | Best for                                                                     | Storage and identity                                                    |
 | ------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| The Partner Brief, standalone Studio  | Explore scenarios, refine a design, print a brief                            | Browser local storage; no sign-in or shared workspace                   |
+| The Partner Brief, standalone app     | Explore scenarios, refine a design, print a brief                            | Browser local storage; no sign-in or shared workspace                   |
 | Channel Architect Open Mercato module | Shared programs, independent approval, immutable history, and pilot tracking | Host authentication, tenant/organization scoping, and the host database |
 
-The standalone Studio does not sync with the module automatically. To use team workflows, install the package into an Open Mercato host.
+The Partner Brief does not sync with the module automatically. To use team workflows, install the package into an Open Mercato host.
 
-## 2. Download and run the standalone Studio
+## 2. Download and run The Partner Brief
 
 ### Requirements
 
@@ -100,7 +100,7 @@ Programs and pilots are not CRM partner records. This scope does not add partner
 - A separate Open Mercato host compatible with version 0.6.x. The module was validated against Open Mercato CLI/Core/Shared/UI 0.6.0.
 - A database configured for that host.
 - A package manager supported by the host. The example commands below use Yarn, as in the validated host.
-- Access to the current Channel Architect Studio source path.
+- Access to the current Channel Architect source path.
 
 This repository is an extension package, not a fork of Open Mercato core. Keep the host's core source unchanged.
 
@@ -204,7 +204,7 @@ The root `bun run lint` command is not currently a clean verification gate. It r
 
 ## 8. Known boundaries
 
-- The standalone Studio is browser-local and has no user accounts or shared database.
+- The Partner Brief is browser-local and has no user accounts or shared database.
 - The module must be installed in a separate Open Mercato host for shared records and authenticated approvals.
 - The generator is deterministic and does not make its hypotheses evidence-backed.
 - Planning emphasis is not commercial economics or revenue credit.

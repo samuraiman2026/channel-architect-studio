@@ -4,7 +4,7 @@ export const Route = createFileRoute("/about")({
   component: AboutPage,
   head: () => ({
     meta: [
-      { title: "About — The Partner Brief" },
+      { title: "About The Partner Brief | Channel Architect" },
       {
         name: "description",
         content:
@@ -36,9 +36,9 @@ function AboutPage() {
         </h1>
         <div className="space-y-5 text-foreground leading-relaxed">
           <p>
-            The Partner Brief is a partner-program planning tool authored by Pranjal. It turns your
-            company context, preferred partner types, planning emphasis, and stage into a first
-            design for review.
+            The Partner Brief is the standalone planning tool within Channel Architect, authored by
+            Pranjal. It turns your company context, preferred partner types, planning emphasis, and
+            stage into a first design for review.
           </p>
           <p>
             This version uses explicit rules, not an AI model or externally validated benchmarks.
@@ -47,8 +47,9 @@ function AboutPage() {
             partner evidence.
           </p>
           <p className="text-sm text-muted-foreground italic pt-4">
-            Drafts are saved only in this browser. Shared workspaces, evidence records, approvals,
-            and operational workflows are planned for a later version.
+            Drafts and endorsement notes stay in this browser. Channel Architect also has a separate
+            Open Mercato module for shared program versions, independent review, and pilot tracking.
+            This standalone tool does not sync with that workspace.
           </p>
         </div>
       </main>

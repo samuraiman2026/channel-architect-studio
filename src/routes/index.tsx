@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
   component: ChannelArchitect,
   head: () => ({
     meta: [
-      { title: "Channel Architect" },
+      { title: "The Partner Brief | Channel Architect" },
       {
         name: "description",
         content:
@@ -305,6 +305,9 @@ function ScenarioSelector({
         <h1 className="font-serif text-5xl sm:text-6xl text-primary tracking-tight mb-4">
           The Partner Brief
         </h1>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-5">
+          A Channel Architect planning tool
+        </p>
         <p className="text-lg text-muted-foreground mb-8">
           A working draft for your partner program, built from your choices.
         </p>

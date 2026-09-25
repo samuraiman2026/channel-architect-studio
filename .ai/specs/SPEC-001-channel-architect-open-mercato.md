@@ -9,13 +9,13 @@
 
 The shared deterministic engine has a pinned version registry, so persisted inputs replay only with their recorded engine; unsupported versions fail visibly. The Open Mercato package includes scenario presets, tenant-scoped program/version/review and pilot/checkpoint entities, validators, registered commands, guarded API routes, a backend workspace, default feature grants, and the initial migration. Program versions are immutable; reviews belong to one version; pilots require the current approved version. The host create/revise form captures planning emphasis, archetypes, and stage. Lists support search, pagination, and status filters. Program/pilot commands emit host audit metadata with safe redo payloads and are non-undoable. Review controls are withheld from the owner/version creator, and server authorization remains authoritative.
 
-The standalone Studio continues to work without a host. Its drafts are browser-local, remain unapproved, and record the design-engine version. Historical local approval labels are migrated to clearly identified endorsement notes. The shared demo pack contains fictional examples only and does not seed a database.
+The Partner Brief continues to work without a host. Its drafts are browser-local, remain unapproved, and record the design-engine version. Historical local approval labels are migrated to clearly identified endorsement notes. The shared demo pack contains fictional examples only and does not seed a database.
 
 Host discovery/runtime/schema checks used the official-modules sandbox and Open Mercato CLI/Core/Shared/UI 0.6.0. The initial schema migration was generated and applied only to a disposable PostgreSQL 17 acceptance database. The host Playwright acceptance scenario was run there and covers role grants, owner/reviewer separation, cross-organization isolation, persisted versions, approval/rejection, pilot creation and completion, stale/unapproved version rejection, and archive behavior. The package build excludes the acceptance spec from runtime output. The standalone and demo-data test slice passes; the module command suite additionally requires the host peer packages. Focused strict module type-checking passes against host packages. A transitive duplicate-React type mismatch remains in the wider sandbox check, and the host's bundled OpenAPI generator uses its static fallback when `isolated-vm` has no native build for the installed Node version.
 
 ## Outcome
 
-Evolve Channel Architect Studio from a single-browser planning prototype into an installable Open Mercato module for designing, versioning, and reviewing partner programs. Preserve the standalone Studio experience while making one deterministic design engine the source of truth.
+Evolve Channel Architect from a single-browser planning prototype into an installable Open Mercato module for designing, versioning, and reviewing partner programs. Preserve The Partner Brief as the standalone experience while making one deterministic design engine the source of truth.
 
 ## Product boundary
 
@@ -93,6 +93,6 @@ A pilot is scoped to a tenant and organization and references one approved, curr
 ## Remaining product and validation boundaries
 
 - The Studio repository is not itself an Open Mercato host. Each adopter must install the package, generate its host registries, configure role grants, and apply the migration through its own reviewed deployment process.
-- The standalone Studio remains browser-local. Its endorsement note is not an authenticated review decision or authorization boundary.
+- The Partner Brief remains browser-local. Its endorsement note is not an authenticated review decision or authorization boundary.
 - Partner CRM, opportunity attribution, enrollment, commercial-term execution, payouts, and external synchronization are out of scope for this module slice.
 - The wider host sandbox type-check retains a transitive duplicate-React issue; see `docs/open-mercato-integration.md` for current validation notes.
