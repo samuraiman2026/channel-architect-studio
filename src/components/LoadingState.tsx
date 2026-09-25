@@ -40,20 +40,12 @@ export function LoadingState({ totalMs }: Props) {
             <li
               key={step}
               className={`flex items-center gap-3 text-sm ${
-                isDone
-                  ? "text-foreground"
-                  : isActive
-                  ? "text-foreground"
-                  : "text-muted-foreground"
+                isDone ? "text-foreground" : isActive ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               <span
                 className={`inline-flex items-center justify-center w-4 h-4 text-[10px] ${
-                  isDone
-                    ? "text-primary"
-                    : isActive
-                    ? "text-primary animate-pulse"
-                    : "text-border"
+                  isDone ? "text-primary" : isActive ? "text-primary animate-pulse" : "text-border"
                 }`}
               >
                 {isDone ? "✓" : isActive ? "•" : "○"}

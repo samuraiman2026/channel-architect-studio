@@ -15,9 +15,7 @@ export function ScenarioCard({ scenario, onSelect }: Props) {
 
   return (
     <div className="flex flex-col h-full border border-border bg-card p-6">
-      <h3 className="font-serif text-xl text-primary leading-tight mb-4">
-        {scenario.label}
-      </h3>
+      <h3 className="font-serif text-xl text-primary leading-tight mb-4">{scenario.label}</h3>
       <dl className="flex-1 space-y-2 text-sm">
         {facts.map(([k, v]) => (
           <div key={k} className="grid grid-cols-[80px_1fr] gap-3">

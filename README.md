@@ -11,6 +11,8 @@ The two experiences use the same deterministic design engine. The standalone app
 
 Requirements: [Bun](https://bun.sh/) 1.3 or later. No database, API key, or environment file is needed for the standalone Studio.
 
+The GitHub repository is currently private. Give a recipient repository access before sending the link, or send them a source ZIP. With a ZIP, extract it first and run the commands from the extracted `channel-architect-studio` folder, starting at `bun install --frozen-lockfile`.
+
 ```sh
 git clone https://github.com/samuraiman2026/channel-architect-studio.git
 cd channel-architect-studio
@@ -19,6 +21,8 @@ bun run dev
 ```
 
 Open the local URL printed by Bun. The Studio is a client-side planning tool. Choose one of the included scenarios or enter a company/project context, set an owner, adjust the partner and planning inputs, then generate a nine-section draft. Use **Download as PDF** to open the browser's print dialog and save a copy.
+
+For a quick demo, choose **AI Infrastructure, Series B**, enter a program owner, and select **Generate program design**. Refresh the page to find the saved version under **Saved program versions on this device**. No setup data or login is required.
 
 Drafts are saved in local storage in the current browser only. They are not synced or backed up. A local endorsement is only a note on that device, not an authenticated approval.
 
@@ -31,12 +35,10 @@ For a guided demo with fictional program briefs, see [`packages/channel-architec
 ## Development checks
 
 ```sh
-bun test src/lib packages/channel-architect/tests/demoData.test.ts
-bun run build
-bun run --cwd packages/channel-architect build
+bun run check
 ```
 
-The Open Mercato command tests require the module's host peer dependencies. The host acceptance scenario is at `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`.
+This checks lint, TypeScript, the standalone and demo-data tests, the standalone production build, and the module build. Lint may report six existing React Refresh warnings in shared UI components, but has no errors. The Open Mercato command tests require the module's host peer dependencies. The host acceptance scenario is at `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`.
 
 Read [`dev_context.md`](dev_context.md) for the detailed user and developer guide, and [`docs/open-mercato-integration.md`](docs/open-mercato-integration.md) for product boundaries and integration status.
 

@@ -34,6 +34,7 @@ The standalone Studio does not sync with the module automatically. To use team w
 - Bun 1.3 or later. The repository includes `bun.lock` and was checked with Bun 1.3.14.
 - A browser with JavaScript enabled.
 - No database, account, API key, or `.env` file for the standalone app.
+- If cloning the private GitHub repository, an invitation/access to it. If you received a source ZIP instead, extract it and start with the Bun install command inside the extracted folder.
 
 ### Install and launch
 
@@ -51,9 +52,11 @@ Useful commands from the repository root:
 ```sh
 bun run dev                                  # start the local Studio
 bun run build                                # production-build the standalone app
-bun run lint                                 # currently reports repository-wide lint/style debt
+bun run lint                                 # no errors; six React Refresh warnings in shared UI components
+bun run typecheck                            # check standalone TypeScript types
 bun test src/lib packages/channel-architect/tests/demoData.test.ts
 bun run --cwd packages/channel-architect build
+bun run check                                # run all five checks above
 ```
 
 The focused test command runs standalone rules and demo-data tests. Open Mercato command tests need the Open Mercato peer packages installed in the host workspace. The host acceptance test is `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`.

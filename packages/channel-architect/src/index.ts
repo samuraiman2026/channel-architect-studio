@@ -1,1 +1,1 @@
-export * from './modules/channel_architect/index'
+export * from "./modules/channel_architect/index";

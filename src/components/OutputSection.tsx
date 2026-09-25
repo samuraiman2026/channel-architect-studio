@@ -21,16 +21,9 @@ export function OutputSection({ letter, title, markdown }: Props) {
   };
 
   return (
-    <section
-      data-output-section
-      className="scroll-mt-20"
-      aria-labelledby={`sec-${letter}`}
-    >
+    <section data-output-section className="scroll-mt-20" aria-labelledby={`sec-${letter}`}>
       <div className="flex items-start justify-between gap-4 mb-5 pb-3 border-b border-border">
-        <h2
-          id={`sec-${letter}`}
-          className="font-serif text-2xl text-primary leading-tight"
-        >
+        <h2 id={`sec-${letter}`} className="font-serif text-2xl text-primary leading-tight">
           <span className="text-muted-foreground mr-2">{letter}.</span>
           {title}
         </h2>
@@ -46,9 +39,7 @@ export function OutputSection({ letter, title, markdown }: Props) {
       <div className="prose-doc">
         <ReactMarkdown
           components={{
-            p: ({ children }) => (
-              <p className="my-4 leading-relaxed text-foreground">{children}</p>
-            ),
+            p: ({ children }) => <p className="my-4 leading-relaxed text-foreground">{children}</p>,
             h2: ({ children }) => (
               <h3 className="font-serif text-lg text-primary mt-8 mb-3">{children}</h3>
             ),
@@ -58,13 +49,9 @@ export function OutputSection({ letter, title, markdown }: Props) {
               </h4>
             ),
             ul: ({ children }) => (
-              <ul className="my-4 space-y-2 list-disc pl-5 marker:text-primary/60">
-                {children}
-              </ul>
+              <ul className="my-4 space-y-2 list-disc pl-5 marker:text-primary/60">{children}</ul>
             ),
-            li: ({ children }) => (
-              <li className="leading-relaxed text-foreground">{children}</li>
-            ),
+            li: ({ children }) => <li className="leading-relaxed text-foreground">{children}</li>,
             strong: ({ children }) => (
               <strong className="font-semibold text-primary">{children}</strong>
             ),

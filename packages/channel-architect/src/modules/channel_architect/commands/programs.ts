@@ -1,44 +1,56 @@
-import { randomUUID } from 'node:crypto'
-import { registerCommand } from '@open-mercato/shared/lib/commands'
-import type { CommandHandler } from '@open-mercato/shared/lib/commands'
-import type { EntityManager } from '@mikro-orm/postgresql'
-import { CrudHttpError, notFound } from '@open-mercato/shared/lib/crud/errors'
-import { withAtomicFlush } from '@open-mercato/shared/lib/commands/flush'
-import { generateDesign, validateDesignInputs, DESIGN_ENGINE_VERSION } from '../lib/designEngine'
+import { randomUUID } from "node:crypto";
+import { registerCommand } from "@open-mercato/shared/lib/commands";
+import type { CommandHandler } from "@open-mercato/shared/lib/commands";
+import type { EntityManager } from "@mikro-orm/postgresql";
+import { CrudHttpError, notFound } from "@open-mercato/shared/lib/crud/errors";
+import { withAtomicFlush } from "@open-mercato/shared/lib/commands/flush";
+import { generateDesign, validateDesignInputs, DESIGN_ENGINE_VERSION } from "../lib/designEngine";
 import {
   ChannelArchitectProgram,
   ChannelArchitectProgramReview,
   ChannelArchitectProgramVersion,
-} from '../data/entities'
+} from "../data/entities";
 import {
   programCreateSchema,
   programArchiveSchema,
   programRevisionSchema,
   programReviewSchema,
-} from '../data/validators'
-import { ensureOrganizationScope, ensureTenantScope } from './scope'
-import { buildChannelArchitectAuditLog } from './audit'
+} from "../data/validators";
+import { ensureOrganizationScope, ensureTenantScope } from "./scope";
+import { buildChannelArchitectAuditLog } from "./audit";
 
-type ProgramScope = { tenantId: string; organizationId: string }
-type CreateProgramInput = ProgramScope & { name: string; scenario: unknown; settings: unknown }
-type ReviseProgramInput = ProgramScope & { programId: string; expectedVersion: number; scenario: unknown; settings: unknown }
-type ArchiveProgramInput = ProgramScope & { programId: string; expectedVersion: number }
-type ReviewProgramInput = ProgramScope & { programVersionId: string; decision: 'approved' | 'rejected'; rationale: string }
+type ProgramScope = { tenantId: string; organizationId: string };
+type CreateProgramInput = ProgramScope & { name: string; scenario: unknown; settings: unknown };
+type ReviseProgramInput = ProgramScope & {
+  programId: string;
+  expectedVersion: number;
+  scenario: unknown;
+  settings: unknown;
+};
+type ArchiveProgramInput = ProgramScope & { programId: string; expectedVersion: number };
+type ReviewProgramInput = ProgramScope & {
+  programVersionId: string;
+  decision: "approved" | "rejected";
+  rationale: string;
+};
 
-const createProgram: CommandHandler<CreateProgramInput, { programId: string; versionId: string; version: number }> = {
-  id: 'channel_architect.programs.create',
+const createProgram: CommandHandler<
+  CreateProgramInput,
+  { programId: string; versionId: string; version: number }
+> = {
+  id: "channel_architect.programs.create",
   isUndoable: false,
   async execute(raw, ctx) {
-    const parsed = programCreateSchema.parse(raw)
-    ensureTenantScope(ctx, raw.tenantId)
-    ensureOrganizationScope(ctx, raw.organizationId)
-    const errors = validateDesignInputs(parsed.scenario, parsed.settings)
-    if (errors.length) throw new CrudHttpError(400, { error: errors.join(' ') })
+    const parsed = programCreateSchema.parse(raw);
+    ensureTenantScope(ctx, raw.tenantId);
+    ensureOrganizationScope(ctx, raw.organizationId);
+    const errors = validateDesignInputs(parsed.scenario, parsed.settings);
+    if (errors.length) throw new CrudHttpError(400, { error: errors.join(" ") });
 
-    const actorId = ctx.auth?.sub
-    if (!actorId) throw new CrudHttpError(401, { error: 'Authenticated actor is required.' })
-    const em = (ctx.container.resolve('em') as EntityManager).fork()
-    const outputSnapshot = generateDesign(parsed.scenario, parsed.settings)
+    const actorId = ctx.auth?.sub;
+    if (!actorId) throw new CrudHttpError(401, { error: "Authenticated actor is required." });
+    const em = (ctx.container.resolve("em") as EntityManager).fork();
+    const outputSnapshot = generateDesign(parsed.scenario, parsed.settings);
     const program = em.create(ChannelArchitectProgram, {
       id: randomUUID(),
       tenantId: raw.tenantId,
@@ -47,7 +59,7 @@ const createProgram: CommandHandler<CreateProgramInput, { programId: string; ver
       ownerUserId: actorId,
       createdBy: actorId,
       currentVersionNumber: 1,
-    })
+    });
     const version = em.create(ChannelArchitectProgramVersion, {
       id: randomUUID(),
       tenantId: raw.tenantId,
@@ -59,47 +71,61 @@ const createProgram: CommandHandler<CreateProgramInput, { programId: string; ver
       outputSnapshot,
       engineVersion: DESIGN_ENGINE_VERSION,
       createdBy: actorId,
-    })
+    });
 
-    await withAtomicFlush(em, [async () => { em.persist([program, version]) }], { transaction: true })
-    return { programId: program.id, versionId: version.id, version: 1 }
+    await withAtomicFlush(
+      em,
+      [
+        async () => {
+          em.persist([program, version]);
+        },
+      ],
+      { transaction: true },
+    );
+    return { programId: program.id, versionId: version.id, version: 1 };
   },
-  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
-    actionLabel: 'Create partner program',
-    resourceKind: 'channel_architect.program',
-    resourceId: result.programId,
-    tenantId: input.tenantId,
-    organizationId: input.organizationId,
-    actorUserId: ctx.auth?.sub ?? null,
-    relatedResourceKind: 'channel_architect.program_version',
-    relatedResourceId: result.versionId,
-    payload: { programId: result.programId, versionId: result.versionId, version: result.version },
-  }),
-}
+  buildLog: ({ input, result, ctx }) =>
+    buildChannelArchitectAuditLog({
+      actionLabel: "Create partner program",
+      resourceKind: "channel_architect.program",
+      resourceId: result.programId,
+      tenantId: input.tenantId,
+      organizationId: input.organizationId,
+      actorUserId: ctx.auth?.sub ?? null,
+      relatedResourceKind: "channel_architect.program_version",
+      relatedResourceId: result.versionId,
+      payload: {
+        programId: result.programId,
+        versionId: result.versionId,
+        version: result.version,
+      },
+    }),
+};
 
 const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; version: number }> = {
-  id: 'channel_architect.programs.revise',
+  id: "channel_architect.programs.revise",
   isUndoable: false,
   async execute(raw, ctx) {
-    const parsed = programRevisionSchema.parse(raw)
-    ensureTenantScope(ctx, raw.tenantId)
-    ensureOrganizationScope(ctx, raw.organizationId)
-    const errors = validateDesignInputs(parsed.scenario, parsed.settings)
-    if (errors.length) throw new CrudHttpError(400, { error: errors.join(' ') })
-    const actorId = ctx.auth?.sub
-    if (!actorId) throw new CrudHttpError(401, { error: 'Authenticated actor is required.' })
+    const parsed = programRevisionSchema.parse(raw);
+    ensureTenantScope(ctx, raw.tenantId);
+    ensureOrganizationScope(ctx, raw.organizationId);
+    const errors = validateDesignInputs(parsed.scenario, parsed.settings);
+    if (errors.length) throw new CrudHttpError(400, { error: errors.join(" ") });
+    const actorId = ctx.auth?.sub;
+    if (!actorId) throw new CrudHttpError(401, { error: "Authenticated actor is required." });
 
-    const em = (ctx.container.resolve('em') as EntityManager).fork()
+    const em = (ctx.container.resolve("em") as EntityManager).fork();
     const program = await em.findOne(ChannelArchitectProgram, {
       id: raw.programId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       isActive: true,
       deletedAt: null,
-    })
-    if (!program) throw notFound('Program not found')
-    if (program.status === 'archived') throw new CrudHttpError(409, { error: 'Archived programs cannot be revised.' })
-    const nextVersion = parsed.expectedVersion + 1
+    });
+    if (!program) throw notFound("Program not found");
+    if (program.status === "archived")
+      throw new CrudHttpError(409, { error: "Archived programs cannot be revised." });
+    const nextVersion = parsed.expectedVersion + 1;
     const version = em.create(ChannelArchitectProgramVersion, {
       id: randomUUID(),
       tenantId: raw.tenantId,
@@ -111,108 +137,145 @@ const reviseProgram: CommandHandler<ReviseProgramInput, { versionId: string; ver
       outputSnapshot: generateDesign(parsed.scenario, parsed.settings),
       engineVersion: DESIGN_ENGINE_VERSION,
       createdBy: actorId,
-    })
+    });
 
-    await withAtomicFlush(em, [async () => {
-      const updated = await em.nativeUpdate(ChannelArchitectProgram, {
-        id: program.id,
-        tenantId: raw.tenantId,
-        organizationId: raw.organizationId,
-        currentVersionNumber: parsed.expectedVersion,
-        status: program.status,
-        isActive: true,
-        deletedAt: null,
-      }, { currentVersionNumber: nextVersion, updatedAt: new Date() })
-      if (updated !== 1) throw new CrudHttpError(409, { error: 'Program changed. Reload the latest version before revising.' })
-      em.persist(version)
-    }], { transaction: true })
-    return { versionId: version.id, version: nextVersion }
+    await withAtomicFlush(
+      em,
+      [
+        async () => {
+          const updated = await em.nativeUpdate(
+            ChannelArchitectProgram,
+            {
+              id: program.id,
+              tenantId: raw.tenantId,
+              organizationId: raw.organizationId,
+              currentVersionNumber: parsed.expectedVersion,
+              status: program.status,
+              isActive: true,
+              deletedAt: null,
+            },
+            { currentVersionNumber: nextVersion, updatedAt: new Date() },
+          );
+          if (updated !== 1)
+            throw new CrudHttpError(409, {
+              error: "Program changed. Reload the latest version before revising.",
+            });
+          em.persist(version);
+        },
+      ],
+      { transaction: true },
+    );
+    return { versionId: version.id, version: nextVersion };
   },
-  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
-    actionLabel: 'Revise partner program',
-    resourceKind: 'channel_architect.program',
-    resourceId: input.programId,
-    tenantId: input.tenantId,
-    organizationId: input.organizationId,
-    actorUserId: ctx.auth?.sub ?? null,
-    relatedResourceKind: 'channel_architect.program_version',
-    relatedResourceId: result.versionId,
-    payload: { programId: input.programId, versionId: result.versionId, version: result.version },
-  }),
-}
+  buildLog: ({ input, result, ctx }) =>
+    buildChannelArchitectAuditLog({
+      actionLabel: "Revise partner program",
+      resourceKind: "channel_architect.program",
+      resourceId: input.programId,
+      tenantId: input.tenantId,
+      organizationId: input.organizationId,
+      actorUserId: ctx.auth?.sub ?? null,
+      relatedResourceKind: "channel_architect.program_version",
+      relatedResourceId: result.versionId,
+      payload: { programId: input.programId, versionId: result.versionId, version: result.version },
+    }),
+};
 
-const archiveProgram: CommandHandler<ArchiveProgramInput, { programId: string; status: 'archived' }> = {
-  id: 'channel_architect.programs.archive',
+const archiveProgram: CommandHandler<
+  ArchiveProgramInput,
+  { programId: string; status: "archived" }
+> = {
+  id: "channel_architect.programs.archive",
   isUndoable: false,
   async execute(raw, ctx) {
-    const parsed = programArchiveSchema.parse(raw)
-    ensureTenantScope(ctx, raw.tenantId)
-    ensureOrganizationScope(ctx, raw.organizationId)
-    if (!ctx.auth?.sub) throw new CrudHttpError(401, { error: 'Authenticated actor is required to archive a program.' })
-    const em = (ctx.container.resolve('em') as EntityManager).fork()
+    const parsed = programArchiveSchema.parse(raw);
+    ensureTenantScope(ctx, raw.tenantId);
+    ensureOrganizationScope(ctx, raw.organizationId);
+    if (!ctx.auth?.sub)
+      throw new CrudHttpError(401, {
+        error: "Authenticated actor is required to archive a program.",
+      });
+    const em = (ctx.container.resolve("em") as EntityManager).fork();
     const program = await em.findOne(ChannelArchitectProgram, {
       id: raw.programId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       isActive: true,
       deletedAt: null,
-    })
-    if (!program) throw notFound('Program not found')
-    if (program.status === 'archived') throw new CrudHttpError(409, { error: 'Program is already archived.' })
+    });
+    if (!program) throw notFound("Program not found");
+    if (program.status === "archived")
+      throw new CrudHttpError(409, { error: "Program is already archived." });
 
-    await withAtomicFlush(em, [async () => {
-      const updated = await em.nativeUpdate(ChannelArchitectProgram, {
-        id: program.id,
-        tenantId: raw.tenantId,
-        organizationId: raw.organizationId,
-        currentVersionNumber: parsed.expectedVersion,
-        status: program.status,
-        isActive: true,
-        deletedAt: null,
-      }, { status: 'archived', updatedAt: new Date() })
-      if (updated !== 1) throw new CrudHttpError(409, { error: 'Program changed before it could be archived. Reload and try again.' })
-    }], { transaction: true })
-    return { programId: program.id, status: 'archived' }
+    await withAtomicFlush(
+      em,
+      [
+        async () => {
+          const updated = await em.nativeUpdate(
+            ChannelArchitectProgram,
+            {
+              id: program.id,
+              tenantId: raw.tenantId,
+              organizationId: raw.organizationId,
+              currentVersionNumber: parsed.expectedVersion,
+              status: program.status,
+              isActive: true,
+              deletedAt: null,
+            },
+            { status: "archived", updatedAt: new Date() },
+          );
+          if (updated !== 1)
+            throw new CrudHttpError(409, {
+              error: "Program changed before it could be archived. Reload and try again.",
+            });
+        },
+      ],
+      { transaction: true },
+    );
+    return { programId: program.id, status: "archived" };
   },
-  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
-    actionLabel: 'Archive partner program',
-    resourceKind: 'channel_architect.program',
-    resourceId: result.programId,
-    tenantId: input.tenantId,
-    organizationId: input.organizationId,
-    actorUserId: ctx.auth?.sub ?? null,
-    payload: { programId: result.programId, status: result.status },
-  }),
-}
+  buildLog: ({ input, result, ctx }) =>
+    buildChannelArchitectAuditLog({
+      actionLabel: "Archive partner program",
+      resourceKind: "channel_architect.program",
+      resourceId: result.programId,
+      tenantId: input.tenantId,
+      organizationId: input.organizationId,
+      actorUserId: ctx.auth?.sub ?? null,
+      payload: { programId: result.programId, status: result.status },
+    }),
+};
 
 const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = {
-  id: 'channel_architect.programs.review',
+  id: "channel_architect.programs.review",
   isUndoable: false,
   async execute(raw, ctx) {
-    const parsed = programReviewSchema.parse(raw)
-    ensureTenantScope(ctx, raw.tenantId)
-    ensureOrganizationScope(ctx, raw.organizationId)
-    const actorId = ctx.auth?.sub
-    if (!actorId) throw new CrudHttpError(401, { error: 'Authenticated reviewer is required.' })
-    const em = (ctx.container.resolve('em') as EntityManager).fork()
+    const parsed = programReviewSchema.parse(raw);
+    ensureTenantScope(ctx, raw.tenantId);
+    ensureOrganizationScope(ctx, raw.organizationId);
+    const actorId = ctx.auth?.sub;
+    if (!actorId) throw new CrudHttpError(401, { error: "Authenticated reviewer is required." });
+    const em = (ctx.container.resolve("em") as EntityManager).fork();
     const version = await em.findOne(ChannelArchitectProgramVersion, {
       id: raw.programVersionId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       isActive: true,
       deletedAt: null,
-    })
-    if (!version) throw notFound('Program version not found')
+    });
+    if (!version) throw notFound("Program version not found");
     const program = await em.findOne(ChannelArchitectProgram, {
       id: version.programId,
       tenantId: raw.tenantId,
       organizationId: raw.organizationId,
       isActive: true,
       deletedAt: null,
-    })
-    if (!program) throw notFound('Program not found')
+    });
+    if (!program) throw notFound("Program not found");
     if (program.ownerUserId === actorId || version.createdBy === actorId) {
-      throw new CrudHttpError(403, { error: 'The program owner or version creator cannot review their own version.' })
+      throw new CrudHttpError(403, {
+        error: "The program owner or version creator cannot review their own version.",
+      });
     }
     const existing = await em.findOne(ChannelArchitectProgramReview, {
       programVersionId: version.id,
@@ -220,8 +283,9 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       organizationId: raw.organizationId,
       isActive: true,
       deletedAt: null,
-    })
-    if (existing) throw new CrudHttpError(409, { error: 'This version already has a final review decision.' })
+    });
+    if (existing)
+      throw new CrudHttpError(409, { error: "This version already has a final review decision." });
 
     const review = em.create(ChannelArchitectProgramReview, {
       id: randomUUID(),
@@ -231,39 +295,54 @@ const reviewProgram: CommandHandler<ReviewProgramInput, { reviewId: string }> = 
       decision: parsed.decision,
       rationale: parsed.rationale,
       reviewerUserId: actorId,
-    })
-    await withAtomicFlush(em, [async () => {
-      em.persist(review)
-      if (parsed.decision === 'approved') {
-        await em.nativeUpdate(ChannelArchitectProgram, {
-          id: program.id,
-          tenantId: raw.tenantId,
-          organizationId: raw.organizationId,
-          currentVersionNumber: version.versionNumber,
-          status: 'draft',
-          isActive: true,
-          deletedAt: null,
-        }, { status: 'active', updatedAt: new Date() })
-      }
-    }], { transaction: true })
-    return { reviewId: review.id }
+    });
+    await withAtomicFlush(
+      em,
+      [
+        async () => {
+          em.persist(review);
+          if (parsed.decision === "approved") {
+            await em.nativeUpdate(
+              ChannelArchitectProgram,
+              {
+                id: program.id,
+                tenantId: raw.tenantId,
+                organizationId: raw.organizationId,
+                currentVersionNumber: version.versionNumber,
+                status: "draft",
+                isActive: true,
+                deletedAt: null,
+              },
+              { status: "active", updatedAt: new Date() },
+            );
+          }
+        },
+      ],
+      { transaction: true },
+    );
+    return { reviewId: review.id };
   },
-  buildLog: ({ input, result, ctx }) => buildChannelArchitectAuditLog({
-    actionLabel: `${input.decision === 'approved' ? 'Approve' : 'Reject'} partner program version`,
-    resourceKind: 'channel_architect.program_version',
-    resourceId: input.programVersionId,
-    tenantId: input.tenantId,
-    organizationId: input.organizationId,
-    actorUserId: ctx.auth?.sub ?? null,
-    relatedResourceKind: 'channel_architect.program_review',
-    relatedResourceId: result.reviewId,
-    payload: { programVersionId: input.programVersionId, reviewId: result.reviewId, decision: input.decision },
-  }),
-}
+  buildLog: ({ input, result, ctx }) =>
+    buildChannelArchitectAuditLog({
+      actionLabel: `${input.decision === "approved" ? "Approve" : "Reject"} partner program version`,
+      resourceKind: "channel_architect.program_version",
+      resourceId: input.programVersionId,
+      tenantId: input.tenantId,
+      organizationId: input.organizationId,
+      actorUserId: ctx.auth?.sub ?? null,
+      relatedResourceKind: "channel_architect.program_review",
+      relatedResourceId: result.reviewId,
+      payload: {
+        programVersionId: input.programVersionId,
+        reviewId: result.reviewId,
+        decision: input.decision,
+      },
+    }),
+};
 
-registerCommand(createProgram)
-registerCommand(reviseProgram)
-registerCommand(archiveProgram)
-registerCommand(reviewProgram)
+registerCommand(createProgram);
+registerCommand(reviseProgram);
+registerCommand(archiveProgram);
+registerCommand(reviewProgram);
 
-export { createProgram, reviseProgram, archiveProgram, reviewProgram }
+export { createProgram, reviseProgram, archiveProgram, reviewProgram };
