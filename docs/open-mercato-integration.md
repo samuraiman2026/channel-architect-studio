@@ -1,38 +1,57 @@
-# Open Mercato integration boundary
+# Open Mercato integration
 
-This repository is the Studio prototype and design reference, not the operational PRM system. The current design engine runs entirely in the browser. Drafts are snapshots in localStorage. There is no authentication, tenant isolation, shared storage, enforced approval, partner record, or live CRM integration here.
+## Product boundary
 
-## Integration progress
+Channel Architect Studio contains two related experiences, not one shared deployment:
 
-Build an original `@open-mercato/channel-architect` module for a standalone Open Mercato host application. Open Mercato's current module system supports custom entities, API routes, and backend pages as an external extension, without changing core. Use a locally ejected module when the product needs to own its source. Verify the host's supported APIs and version before implementation. The separate PRM ready-app repository has no identified license as of 2026-09-23; do not copy its code without permission. See the [module development guide](https://github.com/open-mercato/open-mercato/blob/main/.ai/docs/module-development.md) and the [official module workspace](https://github.com/open-mercato/official-modules).
+- The standalone **The Partner Brief** app is a browser-local planning prototype. It has no login, shared database, or server-side review.
+- `packages/channel-architect` is an Open Mercato 0.6.x extension with authenticated, tenant- and organization-scoped programs, immutable versions, review decisions, pilots, and checkpoints.
 
-The deterministic generator, input/output types, and scenario presets now live in `packages/channel-architect`, and the Studio imports that canonical implementation. New local drafts record the engine version; legacy drafts are labeled `legacy-unversioned`. The Open Mercato module now includes tenant-scoped program, version, review, pilot, and checkpoint records; feature grants; input validators; registered command handlers; authenticated API routes; and an initial backend workspace for design, review, and pilot tracking. The host create/revise form exposes planning-emphasis allocation and primary/secondary partner archetypes as well as stage, enforcing a 100% planning total and at least one primary archetype. Version detail shows the exact saved input snapshot. Approving the current version activates a draft program; the version-checked archive action retains history and blocks further revisions and new pilots, including stale concurrent revisions. Pilots are bound to the current approved version. The package build explicitly preserves TypeScript's legacy decorator transform, which MikroORM's legacy decorators require at runtime.
+Both use the deterministic design engine in `packages/channel-architect/src/modules/channel_architect/lib/`. A draft made in the standalone app is not synchronized into Open Mercato. Local endorsement notes are not authenticated approvals.
 
-The current Studio is still browser-local. It keeps drafts unapproved; a local endorsement note is not authenticated approval, and historical local approval labels are migrated to endorsement notes. The host version history clearly labels current draft, approved, rejected, and superseded versions. Persisted design inputs replay through a pinned engine-version registry, with unsupported versions rejected instead of silently using current rules. Host checks used the official-modules workspace at commit `2d548d603f6ae099ff95f17089b8a7d064b9541b`, whose sandbox uses Open Mercato CLI/Core/Shared/UI `0.6.0`. In that sandbox, generation discovered the package's five entities, program and pilot API routes, and backend page; runtime loading resolved all five entity classes and registered the six commands present at that revision. A fresh runtime load against the pinned host packages now registers all seven commands, including archive. The schema generator produced the initial migration plus `.snapshot-open-mercato.json` against a disposable PostgreSQL 17 database; no migration was applied. The package build includes the migration, snapshot, and entity-discovery source needed by the standalone host. All seven program and pilot commands emit host audit metadata with redo inputs limited to safe identifiers/statuses, excluding free text, and are marked non-undoable. Studio production build and typecheck pass, as do 36 deterministic-engine replay, pilot-rule, local-review migration, version-state, and mocked program/pilot-command tests. The command suite verifies tenant and organization scope rejection plus a competing revision that cannot persist a duplicate version. Checkpoint updates recheck pilot status inside the transaction lock to prevent a cancellation race. A targeted strict module-source typecheck passes against the 0.6.0 packages, while the wider sandbox retains a transitive duplicate-React type issue. OpenAPI's bundled approach cannot load `isolated-vm` under Node 26.7, but its static fallback generated the API document. End-to-end authorization/data checks remain outstanding, so the module is not yet install-ready.
+The module extends Open Mercato without patching core. It does not manage CRM partner records, opportunity attribution, enrollment, commissions, payouts, or payment execution. Planning-emphasis percentages are not commission rates, margin, or revenue credit. Generated copy is a hypothesis, not a verified benchmark or forecast.
 
-The package now includes a host-discoverable Playwright acceptance scenario at `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`. Open Mercato associates it with `channel_architect`, and the module build omits the spec from runtime output. It exercises role grants, independent review, version history, pilot completion, stale/unapproved version rejection, and archive behavior. It typechecks against Open Mercato's Playwright package, but has not run against a live host because the module is not yet installed there and the migration remains unapplied.
+## Current implementation and verification
 
-The acceptance scenario also provisions a second organization and checks that an admin from the original organization cannot list, retrieve, revise, or review a program by guessing its ID. This cross-organization path typechecks and is discovered by the host runner, but has not yet executed against a migrated host.
+The initial module scope is implemented: program and version persistence, review workflow, pilot/checkpoint workflow, default feature grants, scoped API routes and commands, backend list/detail forms, search, filters, version history, and migration artifacts.
 
-The package README now documents local installation into an Open Mercato 0.6.x host and explicitly confines migration/application steps to a fresh disposable database for acceptance testing.
+The package was integrated with Open Mercato CLI/Core/Shared/UI 0.6.0. Its initial migration was applied only to a disposable PostgreSQL 17 acceptance database. The host Playwright acceptance flow was run there, covering role grants, owner/reviewer separation, organization isolation, version creation and revision, approval/rejection, pilot transitions and checkpoints, and archive constraints. This validation does not migrate a new host or authorize applying the migration to any other database.
 
-1. **Program**: tenant/organization, name, owner user ID, state, current version, and timestamps.
-2. **Program version**: immutable `Scenario` and `AxisSettings` snapshots, deterministic engine version, generated sections, creator, and timestamp. Revisions append; they do not overwrite prior or approved versions.
-3. **Review decision**: approver, decision, rationale, and timestamp. At most one final decision applies to one immutable version. Approval does not transfer to later versions.
-4. **Pilot and checkpoints**: initial execution scope, linked only to the current approved program version. Status transitions are constrained, checkpoints are individually tracked, and completion requires every checkpoint to be resolved plus a continue/revise/stop outcome.
-5. **Enrollment and contribution**: later scope, link partner organization and opportunity records to the governing program version. Keep sourced, influenced, resold, and built-on roles distinct, with evidence and reviewer.
+The standalone and demo-data tests can be run from the repository root:
 
-Persist the exact engine inputs and outputs server-side through the Open Mercato host. Local drafts must be treated as unapproved, untrusted imports. Never use client-provided prose, payouts, or tier status as authority for operational actions.
+```sh
+bun test src/lib packages/channel-architect/tests/demoData.test.ts
+```
 
-## Acceptance checks for the Open Mercato slice
+The Open Mercato command tests require the host's Open Mercato and MikroORM peer packages. The module acceptance scenario lives at `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts` and is intentionally omitted from package runtime output.
 
-- A user can create a program, change its design, and inspect both versions.
-- A second authorized user can review and approve one version; unauthorized users cannot.
-- A pilot can be created only from the current approved version, and an outcome can be recorded only after all checkpoints are complete or skipped.
-- All pilot records remain within their tenant, preserve the source program version, and record owner and timestamps.
-- All records remain within their tenant and preserve actor, time, and source.
-- A rejected or superseded version cannot silently alter active partner terms.
+One broader validation caveat remains: the focused module type-check succeeds against the pinned host packages, while the wider sandbox type-check has a transitive duplicate-React type mismatch. The host's bundled OpenAPI generator also falls back to static parsing when `isolated-vm` lacks a native build for the installed Node version. Neither caveat changes the module's migration or data-scope rules.
 
-Commercial rates, source data, evidence attachments, and model-assisted narrative are later work. Planning-emphasis percentages in the Studio are not commissions or forecasts.
+## Install into a host
 
-When enabling this package in an already provisioned host, sync the new pilot feature grants with `yarn mercato auth sync-role-acls`; setup defaults alone apply to newly provisioned roles.
+See the [module installation guide](../packages/channel-architect/README.md) for the full command sequence. In brief: build the local package, add it to a separate Open Mercato 0.6.x host using a local file dependency, enable the module, regenerate host registries, then review and apply the migration through the host's normal process. Use a fresh disposable database for acceptance and demos. For production, require the operator's migration review, backup, and release procedure.
+
+When the module is enabled in a host that already has users and roles, synchronize the default grants with:
+
+```sh
+yarn mercato auth sync-role-acls
+```
+
+The `admin` and `superadmin` setup defaults include all program and pilot permissions. `employee` defaults to view-only access. A program owner or version creator cannot review that version. Every request must still be authorized by the host; client-supplied tenant, organization, actor, reviewer, or version values are not authoritative.
+
+## Records and workflows
+
+1. **Program:** stable identity, owning user, lifecycle status, current version, and tenant/organization scope.
+2. **Program version:** append-only input and output snapshot, scenario, planning settings, engine version, creator, and timestamp. Revisions append instead of editing prior versions.
+3. **Review:** one immutable approve/reject decision and rationale for one version. Approval does not carry forward to later versions.
+4. **Pilot:** bound to the current approved program version at creation. Operators use the documented lifecycle and resolve all checkpoints before recording a continue/revise/stop outcome.
+
+Module records use scalar IDs rather than cross-module ORM relationships. Domain writes go through audited, non-undoable commands. API reads and writes are scoped to the authenticated tenant and organization, including detail, review, revision, archive, pilot, and checkpoint operations.
+
+## Demo data
+
+Fictional programs and the guided walkthrough are documented in [`packages/channel-architect/demo/README.md`](../packages/channel-architect/demo/README.md). They are typed examples, not a database seed. Enter them through the Open Mercato UI so real user identity, review separation, authorization, and audit behavior remain active. Never use the demo cohort labels for real customer or partner data.
+
+## Remaining product boundaries
+
+The module is a governed partner-program hypothesis and initial pilot tracker. Future work would be needed for partner CRM, opportunities and sourced/influenced evidence, enrollment, evidence attachments, commercial terms, payout execution, external-system synchronization, and model-assisted narrative. Do not infer these capabilities from the current program or pilot records.

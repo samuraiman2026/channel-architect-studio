@@ -1,19 +1,17 @@
 # SPEC-001: Channel Architect module for Open Mercato
 
-**Status:** In progress
+**Status:** Initial module scope implemented and validated in a disposable Open Mercato host
 **Target host:** Open Mercato 0.6.x
 **Module package:** `@open-mercato/channel-architect`
 **Module ID:** `channel_architect`
 
 ## Implementation status
 
-The shared deterministic engine now has a pinned version registry so persisted inputs replay only with their recorded engine; unsupported versions fail visibly. Scenario presets, tenant-scoped program/review and pilot entities, validators, registered commands, guarded API routes, backend workspace, and initial module migration are implemented. The host create/revise flow exposes the complete design inputs (planning emphasis, partner archetypes, and stage), and saved version details show those immutable inputs. Studio browser drafts now remain explicitly unapproved; historical local approval labels are migrated to clearly identified endorsement notes. Host version history labels current draft, approved, rejected, and superseded states. All seven program and pilot commands now emit host audit metadata with redacted redo payloads, excluding free-text inputs, and are explicitly non-undoable. Studio production build and typecheck pass, and 36 deterministic-engine replay, pilot-rule, local-review migration, version-state, and mocked program/pilot-command tests pass. Command tests cover tenant and organization scope rejection plus a competing revision that cannot persist a duplicate version. Checkpoint updates now recheck pilot status inside the transaction lock to prevent a cancellation race. Host discovery/runtime/schema checks used the official-modules sandbox at commit `2d548d603f6ae099ff95f17089b8a7d064b9541b`, with Open Mercato CLI/Core/Shared/UI `0.6.0`. A targeted strict module-source typecheck passes against those 0.6.0 packages; a transitive duplicate-React type issue remains in the wider sandbox check. Sandbox-wide host typecheck and end-to-end authorization/data workflow validation remain open. Sandbox generation discovers the package's entities, routes, page, and feature metadata. A fresh runtime load against the pinned host packages registers all seven current program and pilot commands. The schema generator produced the initial migration and matching snapshot against a disposable PostgreSQL 17 database; no migration was applied. The host's bundled OpenAPI generator falls back to static parsing because `isolated-vm` has no Node 26.7 native build.
+The shared deterministic engine has a pinned version registry, so persisted inputs replay only with their recorded engine; unsupported versions fail visibly. The Open Mercato package includes scenario presets, tenant-scoped program/version/review and pilot/checkpoint entities, validators, registered commands, guarded API routes, a backend workspace, default feature grants, and the initial migration. Program versions are immutable; reviews belong to one version; pilots require the current approved version. The host create/revise form captures planning emphasis, archetypes, and stage. Lists support search, pagination, and status filters. Program/pilot commands emit host audit metadata with safe redo payloads and are non-undoable. Review controls are withheld from the owner/version creator, and server authorization remains authoritative.
 
-The module now has a host-discoverable Playwright acceptance scenario in `packages/channel-architect/src/modules/channel_architect/__integration__/TC-CHANNEL-ARCHITECT-001.spec.ts`. It covers role grants, owner/reviewer separation, persisted program versions, approved-version pilot creation and completion, rejection of stale or unapproved pilot versions, and archive behavior. The scenario typechecks against the host Playwright package but has not yet run against an installed host with the module migration applied; package builds explicitly omit integration specs.
+The standalone Studio continues to work without a host. Its drafts are browser-local, remain unapproved, and record the design-engine version. Historical local approval labels are migrated to clearly identified endorsement notes. The shared demo pack contains fictional examples only and does not seed a database.
 
-The scenario also creates a second organization and verifies that a reviewer with program permissions in the primary organization cannot list, retrieve, revise, or review a guessed program ID from the other organization. This check is prepared but remains unexecuted until the module is wired into a host with its migration applied.
-
-The backend workspace now paginates, searches, and filters programs and pilots. Pilot rows resolve their linked program name and immutable version number. Mutation controls reflect Open Mercato feature grants, and review controls are withheld from the program owner and version creator; server authorization remains authoritative. The acceptance scenario covers these UI permissions and list filters. The standalone Studio production build, strict host-module/acceptance typecheck, and 36 focused tests pass. The remaining gate is running the acceptance scenario against the installed host with the migration applied to a fresh disposable database.
+Host discovery/runtime/schema checks used the official-modules sandbox and Open Mercato CLI/Core/Shared/UI 0.6.0. The initial schema migration was generated and applied only to a disposable PostgreSQL 17 acceptance database. The host Playwright acceptance scenario was run there and covers role grants, owner/reviewer separation, cross-organization isolation, persisted versions, approval/rejection, pilot creation and completion, stale/unapproved version rejection, and archive behavior. The package build excludes the acceptance spec from runtime output. The standalone and demo-data test slice passes; the module command suite additionally requires the host peer packages. Focused strict module type-checking passes against host packages. A transitive duplicate-React type mismatch remains in the wider sandbox check, and the host's bundled OpenAPI generator uses its static fallback when `isolated-vm` has no native build for the installed Node version.
 
 ## Outcome
 
@@ -75,7 +73,7 @@ A pilot is scoped to a tenant and organization and references one approved, curr
 - Add persistent Program, ProgramVersion, and ReviewDecision entities, validators, scoped command handlers, and authenticated API routes.
 - Add a backend list/create/detail/review experience with version history.
 - Add persistent Pilot and PilotCheckpoint entities, authenticated create/list/status/checkpoint routes, and a backend pilot workflow. Require the current version to be approved and all checkpoints to be resolved before recording an outcome.
-- Produce module migration artifacts for the host. Do not apply migrations to any environment without an explicit request.
+- Produce module migration artifacts for the host. Apply them only through the host operator's reviewed migration process, using a disposable database for acceptance.
 - Add host-install documentation and record the tested Open Mercato version.
 
 ## Acceptance criteria
@@ -92,8 +90,9 @@ A pilot is scoped to a tenant and organization and references one approved, curr
 - Generated prose is labeled as a hypothesis; no payout, forecast, or attribution authority is implied.
 - Host compatibility is verified against Open Mercato 0.6.x before calling the module installable.
 
-## Open implementation risks
+## Remaining product and validation boundaries
 
-- The Studio repository is not itself an Open Mercato host. Host discovery, generated registries, and schema migration generation must be verified in a real 0.6.x sandbox.
-- Sequential version creation needs a transaction and a concurrency strategy, not only a UI-calculated increment.
-- The local Studio continues to use browser storage until an authenticated Open Mercato host is connected. Its endorsement note is not an authenticated review decision or authorization boundary.
+- The Studio repository is not itself an Open Mercato host. Each adopter must install the package, generate its host registries, configure role grants, and apply the migration through its own reviewed deployment process.
+- The standalone Studio remains browser-local. Its endorsement note is not an authenticated review decision or authorization boundary.
+- Partner CRM, opportunity attribution, enrollment, commercial-term execution, payouts, and external synchronization are out of scope for this module slice.
+- The wider host sandbox type-check retains a transitive duplicate-React issue; see `docs/open-mercato-integration.md` for current validation notes.
